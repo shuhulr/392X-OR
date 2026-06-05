@@ -16,9 +16,6 @@ double angular_kd = 12;
 
 pros::Task instigateTask([]() {});
 
-void PIDLog() {
-
-}
 
 void turnToHeadingU30(float heading, int timeout, lemlib::TurnToHeadingParams params, bool async) {
     angularController.kP = 0;
@@ -34,10 +31,9 @@ void turnToHeadingU30(float heading, int timeout, lemlib::TurnToHeadingParams pa
     angularController.windupRange = 5;
 }
 
-void Intake() {
-    intake.move(127);
+void intake() {
+    intakeM.move(127);
     intaking = true;
-    shotgun.move(0);
 }
 
 void moveWithVoltage(int left, int right) {
@@ -50,59 +46,16 @@ void stopDrive() {
     rightMotors.move_voltage(0);
 }
 
-void stopIntaking() {
-    intake.move(0);
+void stopIntake() {
+    intakeM.move(0);
     intaking = false;
 }
 
-void Score(int speed) {
-    shotgun.move_velocity(speed);
-    armMoving = true;
+void score(int speed) {
+
 }
 
-void ScoreS(int timeout) {
-    float error = lemlib::angleError(108, shotgunRS.get_position()/100.0, false);
-    int counter = 0;
-    while(error > 5 && counter < timeout) {
-        error = lemlib::angleError(108, shotgunRS.get_position()/100.0, false);
-        shotgun.move(128 - (80/(1 + pow(2, 0.2*(error - 64) ) ) ) );
-        pros::delay(10);
-        counter += 10;
-    }
-}
-void ScoreS() {
-    float error = lemlib::angleError(108, shotgunRS.get_position()/100.0, false);
-    while(error > 5 && controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2)) {
-        error = lemlib::angleError(108, shotgunRS.get_position()/100.0, false);
-        shotgun.move(128 - (75/(1 + pow(2, 0.2*(error - 65) ) ) ) );
-        pros::delay(10);
-    }
-}
 
-void stopArm() {
-    armMoving = false;
-    shotgun.move(0);
-}
-
-void resetArm() {
-    armMoving = false;
-    shotgun.move(-70);
-}
-void resetArm(int voltage) {
-    armMoving = false;
-    shotgun.move(-voltage);
-}
-
-void antijamShotgun(int speed) {
-    while (armMoving) {
-        if ((shotgun.get_efficiency() < 3) && (shotgun.get_voltage() > 5000)) {
-            shotgun.move(-127);
-            pros::delay(60);
-            shotgun.move_velocity(speed);
-        }
-        pros::delay(20);
-    }
-}
 
 
 double distanceResetX(bool right, int wallOffset) {

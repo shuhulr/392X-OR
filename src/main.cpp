@@ -20,6 +20,8 @@
 
 extern int auton;
 extern bool ovrde;
+bool competitionInitialize = false;
+bool opControl = false;
 
 // odom lift flag
 //bool odomLiftRaise = false;
@@ -28,7 +30,7 @@ extern bool ovrde;
 bool screenTaskRunning = true;
 
 
-//FILE* file = fopen("/usd/auto.txt", "w");
+
 
 
 // controller
@@ -38,35 +40,20 @@ pros::Controller controller(pros::E_CONTROLLER_MASTER);
 pros::MotorGroup leftMotors({-13, 14, -15}, pros::MotorGearset::blue); // left motor group - ports 1, 2 (reversed), 3
 pros::MotorGroup rightMotors({10, 6, -8}, pros::MotorGearset::blue); // right motor group - ports 4 (reversed), 5, 6 (reversed)
 
-bool leverDown = true;
-float leverTarget = 0;
-int leverTime = 0;
-float leverSpeed = 128;
-// bool leverReset = true;
-bool competitionInitialize = false;
-bool opControl = false;
 
 // motors
 pros::Motor intakeRight(19);
 pros::Motor intakeLeft(-21);
-pros::MotorGroup intake({19, -21});
-pros::Motor shotgun(3, pros::MotorGearset::red);
-pros::Rotation shotgunRS(-1);
-
+pros::MotorGroup intakeM({19, -21});
 // optical disconnect on port 12
 // pros::Optical opticalSensor(12);
-
 
 
 // game color (0 for red, 1 for blue, -1 for none)
 int gameColor = -1;
 
 // pneumatics
-pros::adi::Pneumatics drop('G', false, false);
-pros::adi::Pneumatics odomLift('D', true, true);
-pros::adi::Pneumatics descorer('E', false); 
 pros::adi::Pneumatics matchloader('H', false);
-pros::adi::Pneumatics passTheJuice('B', false, false);
 
 
 // Inertial Sensor on port 10
@@ -217,19 +204,10 @@ void rightScreenButton() {
 
 void displayImage();
 void initialize() {
-    shotgunRS.set_position(0);
+    //shotgunRS.set_position(0);
     
     RclMain.startTracking();
     
-
-    /*if(ovrde) {
-        //sdcard index = get<0>(auton)
-        FILE* file = fopen("/usd/auto.txt", "w");
-        fputs(""+auton, file);
-        fclose(file);
-    }*/
-
-    //get<0>(auton) = sdcard index
     FILE* file = fopen("/usd/auto.txt", "r");
     if (file != NULL) {
         char buf[3];        //two for digit, one for null terminator
@@ -288,8 +266,8 @@ void initialize() {
 
             
             pros::lcd::print(5, "Left: %f    Right: %f", leftMotors.get_temperature(), rightMotors.get_temperature());
-            pros::lcd::print(6, "Intake: %f", intake.get_temperature());
-            pros::lcd::print(7, "Shotgun: %f", shotgun.get_temperature());
+            pros::lcd::print(6, "Intake: %f", intakeM.get_temperature());
+            
 
             // pros::lcd::print(5, "L dist: %d  conf: %d", leftDist.get(), leftDist.get_confidence());
             // pros::lcd::print(6, "R dist: %d  conf: %d", rightDist.get(), rightDist.get_confidence());
@@ -353,10 +331,6 @@ void opcontrol() {
     chassis.setBrakeMode(pros::E_MOTOR_BRAKE_COAST);
     printf("\nDriver Control Started\n");
     opControl = true;
-    float error = lemlib::angleError(108, shotgunRS.get_position()/100.0, false);
-    if(auton == 10 || auton == 11) {
-        passTheJuice.extend();
-    }
 
     while (true) {
         // get joystick positions
@@ -372,127 +346,7 @@ void opcontrol() {
         //shuhul drive
         //chassis.arcade(leftY, rightX);
 
-        if (shotgunRS.get_position()/100 < 1 || shotgunRS.get_position()/100 > 355) {
-            leverDown = true;
-            shotgun.set_brake_mode(pros::E_MOTOR_BRAKE_COAST);
-        } else {
-            leverDown = false;
-            shotgun.set_brake_mode(pros::E_MOTOR_BRAKE_BRAKE);
-        }
-        // printf("\n%d\n", shotgunRS.get_position());
-
-        // intake
-        if (controller.get_digital(DIGITAL_R1) && (shotgunRS.get_position()/100 > 355 || shotgunRS.get_position()/100 < 5)) {
-            intake.move(128);
-            odomLift.retract();
-        }
-
-        // outtake
-        else if (controller.get_digital(DIGITAL_L1) || (shotgunRS.get_position()/100 > 30 && shotgunRS.get_position()/100 < 270)) {
-            if (auton == 10 || auton == 11)
-                intake.move(-30);
-            else
-                intake.move(-80);
-        }
         
-        // stop take
-        else {
-            intake.move(0);
-        }
-
-        if (controller.get_digital_new_press(DIGITAL_L2)) {
-            drop.toggle();
-        }
-
-        //
-        if (controller.get_digital(DIGITAL_R2)) {
-            leverTarget = -1;
-            if(!drop.is_extended()) {
-                if ((auton == 10 || auton == 11)) {
-                    passTheJuice.retract();
-                    if(controller.get_digital(DIGITAL_Y))
-                        shotgun.move_velocity(32);
-                    else 
-                        shotgun.move_velocity(17);
-                }
-                else if (!(controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1))) {
-                    shotgun.move_velocity(30);
-                }
-                else {
-                    shotgun.move_velocity(70);
-                }
-
-            
-            }
-            //else if (controller.get_digital(DIGITAL_Y) && !(auton == 10 || auton == 11)) {
-            //    shotgun.move_velocity(100);
-            //}
-            else {
-                if ((auton == 10 || auton == 11)){
-                    error = lemlib::angleError(108, shotgunRS.get_position()/100.0, false);
-                    shotgun.move(128 - (80/(1 + pow(2, 0.2*(error - 70) ) ) ) );
-                    passTheJuice.retract();
-                }
-                else shotgun.move_velocity(70);
-            }
-
-        } else if(!leverDown) {
-            leverTarget = 0;
-            leverSpeed = 70;
-            if(auton == 10 || auton == 11) {
-                passTheJuice.extend();
-            }
-        }
-
-        // matchloader B
-        if (controller.get_digital_new_press(DIGITAL_B)) {
-            matchloader.toggle();
-        }
-
-        // descorer RIGHT
-     
-        if (leverTarget != -1) {
-            float error = leverTarget - shotgunRS.get_position()/100.0f;
-            if ((fabs(error) < 3) || (leverTime > 1000)) {
-                shotgun.brake();
-                leverTarget = -1;
-                leverTime = 0;
-            } else {
-                if (leverTarget == 0) {
-                    shotgun.move(-leverSpeed);
-                }
-                leverTime+=10;
-            }
-        }
-
-        if (controller.get_digital_new_press(DIGITAL_RIGHT)) {
-            /*if(!competitionInitialize) {
-                rightScreenButton();
-            }
-            else */
-            descorer.toggle();
-            
-        }
-
-        if (controller.get_digital_new_press(DIGITAL_DOWN)) {
-            passTheJuice.toggle();
-        }
-
-        if(controller.get_digital_new_press(DIGITAL_UP)) {
-            odomLift.toggle();
-            if(odomLift.is_extended()) {
-                controller.rumble(".");
-            }
-        }
-
-        if (controller.get_digital_new_press(DIGITAL_X)) {
-            pidTest();
-        }
-        
-        
-        /*if(controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_LEFT) && !competitionInitialize) {
-            leftScreenButton();
-        }*/
 
         pros::delay(10);
     }
