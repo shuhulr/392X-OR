@@ -23,9 +23,16 @@ extern lemlib::ControllerSettings linearController;
 extern lemlib::ControllerSettings angularController;
 extern lemlib::ControllerSettings angularControllerU30;
 extern pros::Controller controller;
-extern pros::Motor intakeLeft;
-extern pros::Motor intakeRight;
-extern pros::MotorGroup intakeM;
+
+// intake (port 7, reversed)
+extern pros::Motor intakeMotor;
+
+// lift - cascade (port 12)
+extern pros::Motor liftMotor;
+
+// two-bar / Lady Brown style mechanism (ports 15, 16 reversed)
+extern pros::MotorGroup twoBar;
+
 extern pros::MotorGroup leftMotors;
 extern pros::MotorGroup rightMotors;
 extern pros::adi::Pneumatics matchloader;
@@ -41,9 +48,14 @@ extern RclSensor backRcl;
 extern RclTracking RclMain;
 #endif
 
+// two-bar preset positions, in degrees of motor rotation from the tared
+// (stowed) start position. TODO: tune these once the mechanism is built out.
+extern const double TWO_BAR_STOW_POS;
+extern const double TWO_BAR_SCORE_POS;
+
 // helpers.cpp
 extern void turnToHeadingU30(float heading, int timeout, lemlib::TurnToHeadingParams params = {}, bool async = true);
-extern void intake();
+extern void intake(int voltage);
 extern void moveWithVoltage(int left, int right);
 extern void stopIntake();
 extern void stopDrive();

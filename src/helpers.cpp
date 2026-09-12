@@ -24,8 +24,8 @@ void turnToHeadingU30(float heading, int timeout, lemlib::TurnToHeadingParams pa
     angularController.windupRange = 5;
 }
 
-void intake() {
-    intakeM.move(127);
+void intake(int voltage) {
+    intakeMotor.move(voltage);
     intaking = true;
 }
 
@@ -40,15 +40,21 @@ void stopDrive() {
 }
 
 void stopIntake() {
-    intakeM.move(0);
+    intakeMotor.move(0);
     intaking = false;
 }
 
-// TODO: implement once this season's scoring mechanism is wired up
-void score(int speed) {}
+// outtake/score at a given speed (negative to reverse). Adjust if scoring
+// should behave differently than just running the intake backwards.
+void score(int speed) {
+    intakeMotor.move(speed);
+    intaking = true;
+}
 
-// TODO: implement once this season's arm/lift motor is wired up
+// emergency-stop for the lift and two-bar
 void stopArm() {
+    liftMotor.move(0);
+    twoBar.move(0);
     armMoving = false;
 }
 

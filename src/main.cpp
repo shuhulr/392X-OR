@@ -28,13 +28,26 @@ bool screenTaskRunning = true;
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
 // motor groups
-pros::MotorGroup leftMotors({-13, 14, -15}, pros::MotorGearset::blue);  // left motor group
-pros::MotorGroup rightMotors({10, 6, -8}, pros::MotorGearset::blue);    // right motor group
+// NOTE: ports 1 and 4 (the front motors) are 5.5W motors, while 2/3/5/6 are
+// 11W. Mixing wattages in one group is a known trouble spot - LemLib issue
+// #186 documents 5.5W motors not always being ratioed the same as 11W ones
+// in a group. Keep an eye on drift/uneven power between the front and rear
+// motors; if you see it, that's likely why.
+pros::MotorGroup leftMotors({-1, -2, -3}, pros::MotorGearset::blue);  // left motor group
+pros::MotorGroup rightMotors({4, 5, 6}, pros::MotorGearset::blue);   // right motor group
 
-// motors
-pros::Motor intakeRight(19);
-pros::Motor intakeLeft(-21);
-pros::MotorGroup intakeM({19, -21});
+// intake (port 7, reversed)
+pros::Motor intakeMotor(-7);
+
+// lift - cascade (port 12)
+pros::Motor liftMotor(12);
+
+// two-bar / Lady Brown style mechanism (ports 15, 16 reversed, both 5.5W)
+pros::MotorGroup twoBar({15, -16});
+
+// two-bar preset positions - TODO: tune once the mechanism is built out
+const double TWO_BAR_STOW_POS = 0;
+const double TWO_BAR_SCORE_POS = 90;
 
 // game color (0 for red, 1 for blue, -1 for none)
 int gameColor = -1;
@@ -42,14 +55,14 @@ int gameColor = -1;
 // pneumatics
 pros::adi::Pneumatics matchloader('H', false);
 
-// Inertial Sensor
-pros::Imu imu(20);
+// Inertial Sensor (port 11)
+pros::Imu imu(11);
 
 // tracking wheels
-// horizontal tracking wheel encoder. Rotation sensor, port 12, not reversed
-pros::Rotation horizontalEnc(12);
-// vertical tracking wheel encoder. Rotation sensor, port 2, reversed
-pros::Rotation verticalEnc(-2);
+// vertical odometry rotation sensor, port 9, reversed
+pros::Rotation verticalEnc(-9);
+// horizontal odometry rotation sensor, port 10, reversed
+pros::Rotation horizontalEnc(-10);
 // horizontal tracking wheel. 2" diameter, 3.7" offset behind center (negative)
 lemlib::TrackingWheel horizontal(&horizontalEnc, 2, -3.7);
 // vertical tracking wheel. 2" diameter, 0.4" offset left of center (negative)
@@ -196,6 +209,13 @@ void initialize() {
     RclMain.updateBotPose(&leftRcl);
 #endif
 
+    // hold position when no voltage is applied, instead of coasting/falling
+    liftMotor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+
+    // zero the two-bar's position so TWO_BAR_STOW_POS/SCORE_POS are relative
+    // to wherever it's built to rest at startup
+    twoBar.tare_position();
+
     // thread for brain screen display and position logging
     pros::Task screenTask([&]() {
         while (screenTaskRunning) {
@@ -210,7 +230,7 @@ void initialize() {
             pros::lcd::print(3, "auton index: %d", auton);
             pros::lcd::print(4, "%s", std::get<0>(autons[auton]).c_str());
             pros::lcd::print(5, "Left: %.1f  Right: %.1f", leftMotors.get_temperature(), rightMotors.get_temperature());
-            pros::lcd::print(6, "Intake: %.1f", intakeM.get_temperature());
+            pros::lcd::print(6, "Intake: %.1f  Lift: %.1f", intakeMotor.get_temperature(), liftMotor.get_temperature());
 
             // log position telemetry
             lemlib::telemetrySink()->info("Chassis pose: {}", chassis.getPose());
@@ -254,6 +274,30 @@ void opcontrol() {
         chassis.arcade(rightY, 0.95 * leftX);
         // shuhul drive
         // chassis.arcade(leftY, rightX);
+
+        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1))
+            intake(127);
+        else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1))
+            intake(-128);
+        // TODO: make this one time check flag
+        else
+            stopIntake();
+
+        // lift: hold B to raise, hold down to lower
+        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_B)) {
+            liftMotor.move(127);
+        } else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN)) {
+            liftMotor.move(-127);
+        } else {
+            liftMotor.move(0);
+        }
+
+        // two-bar: while L2 is held, go to scoring position; otherwise return to stow
+        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
+            twoBar.move_absolute(TWO_BAR_SCORE_POS, 100);
+        } else {
+            twoBar.move_absolute(TWO_BAR_STOW_POS, 100);
+        }
 
         pros::delay(10);
     }
