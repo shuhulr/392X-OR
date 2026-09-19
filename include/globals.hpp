@@ -30,8 +30,8 @@ extern pros::Motor intakeMotor;
 // lift - cascade (port 12)
 extern pros::Motor liftMotor;
 
-// two-bar / Lady Brown style mechanism (ports 15, 16 reversed)
-extern pros::MotorGroup twoBar;
+extern pros::Motor pivotMotor;  // claw pitch (15)
+extern pros::Motor clawMotor;   // claw rotation (-16)
 
 extern pros::MotorGroup leftMotors;
 extern pros::MotorGroup rightMotors;
@@ -48,10 +48,6 @@ extern RclSensor backRcl;
 extern RclTracking RclMain;
 #endif
 
-// two-bar preset positions, in degrees of motor rotation from the tared
-// (stowed) start position. TODO: tune these once the mechanism is built out.
-extern const double TWO_BAR_STOW_POS;
-extern const double TWO_BAR_SCORE_POS;
 
 // helpers.cpp
 extern void turnToHeadingU30(float heading, int timeout, lemlib::TurnToHeadingParams params = {}, bool async = true);

@@ -42,12 +42,22 @@ pros::Motor intakeMotor(-7);
 // lift - cascade (port 12)
 pros::Motor liftMotor(12);
 
-// two-bar / Lady Brown style mechanism (ports 15, 16 reversed, both 5.5W)
-pros::MotorGroup twoBar({15, -16});
+// TODO: confirm which port is pivot vs claw, and reversal
+pros::Motor pivotMotor(15);
+pros::Motor clawMotor(-16);
 
-// two-bar preset positions - TODO: tune once the mechanism is built out
-const double TWO_BAR_STOW_POS = 0;
-const double TWO_BAR_SCORE_POS = 90;
+enum class ArmState {STOW, LOAD, PICKUP, SCORING, SCORED};
+ArmState armState = ArmState::STOW;
+
+// TODO: tune all of these once the mechanism is built out
+constexpr double CASCADE_STOW_POS = 0;
+constexpr double CASCADE_LOAD_POS = 800;
+constexpr double CASCADE_PICKUP_POS = 700;
+constexpr double PIVOT_OUT_POS = 0;    // stow / pickup / score
+constexpr double PIVOT_DOWN_POS = 540; // load
+constexpr double CLAW_OUT_POS = 0;
+constexpr double CLAW_DOWN_POS = -180;
+constexpr int SCORE_DROP_MS = 250;     // how long to lower after releasing R2
 
 // game color (0 for red, 1 for blue, -1 for none)
 int gameColor = -1;
@@ -214,7 +224,9 @@ void initialize() {
 
     // zero the two-bar's position so TWO_BAR_STOW_POS/SCORE_POS are relative
     // to wherever it's built to rest at startup
-    twoBar.tare_position();
+    liftMotor.tare_position();
+    pivotMotor.tare_position();
+    clawMotor.tare_position();
 
     // thread for brain screen display and position logging
     pros::Task screenTask([&]() {
@@ -275,28 +287,67 @@ void opcontrol() {
         // shuhul drive
         // chassis.arcade(leftY, rightX);
 
-        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1))
-            intake(127);
-        else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1))
-            intake(-128);
-        // TODO: make this one time check flag
-        else
-            stopIntake();
+        bool aPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A);
+        bool bPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B);
+        bool r2Held = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
+        static uint32_t scoreDropStart = 0;
 
-        // lift: hold B to raise, hold down to lower
-        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_B)) {
-            liftMotor.move(127);
-        } else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_DOWN)) {
-            liftMotor.move(-127);
-        } else {
-            liftMotor.move(0);
+        switch (armState) {
+            case ArmState::STOW:
+                if (aPressed) armState = ArmState::LOAD;
+                else if (bPressed) armState = ArmState::PICKUP;
+                break;
+            case ArmState::LOAD:
+                if (r2Held) armState = ArmState::SCORING;
+                else if (aPressed) armState = ArmState::STOW;
+                else if (bPressed) armState = ArmState::PICKUP;
+                break;
+            case ArmState::PICKUP:
+                if (r2Held) armState = ArmState::SCORING;
+                else if (bPressed) armState = ArmState::STOW;
+                else if (aPressed) armState = ArmState::LOAD;
+                break;
+            case ArmState::SCORING:
+                if (!r2Held) {
+                    armState = ArmState::SCORED;
+                    scoreDropStart = pros::millis();
+                }
+                break;
+            case ArmState::SCORED:
+                if (aPressed) armState = ArmState::STOW;
+                break;
         }
 
-        // two-bar: while L2 is held, go to scoring position; otherwise return to stow
-        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2)) {
-            twoBar.move_absolute(TWO_BAR_SCORE_POS, 100);
-        } else {
-            twoBar.move_absolute(TWO_BAR_STOW_POS, 100);
+        switch (armState) {
+            case ArmState::STOW:
+                liftMotor.move_absolute(CASCADE_STOW_POS, 100);
+                pivotMotor.move_absolute(PIVOT_OUT_POS, 100);
+                clawMotor.move_absolute(CLAW_OUT_POS, 100);
+                break;
+            case ArmState::LOAD:
+                liftMotor.move_absolute(CASCADE_LOAD_POS, 100);
+                pivotMotor.move_absolute(PIVOT_DOWN_POS, 100);
+                clawMotor.move_absolute(CLAW_DOWN_POS, 100);
+                break;
+            case ArmState::PICKUP:
+                liftMotor.move_absolute(CASCADE_PICKUP_POS, 100);
+                pivotMotor.move_absolute(PIVOT_OUT_POS, 100);
+                clawMotor.move_absolute(CLAW_OUT_POS, 100);
+                break;
+            case ArmState::SCORING:
+                liftMotor.move(127); // keep rising while R2 is held
+                pivotMotor.move_absolute(PIVOT_OUT_POS, 100);
+                clawMotor.move_absolute(CLAW_OUT_POS, 100);
+                break;
+            case ArmState::SCORED:
+                if (pros::millis() - scoreDropStart <= SCORE_DROP_MS) {
+                    liftMotor.move(-80); // brief timed drop to score
+                } else {
+                    liftMotor.move(0);
+                }
+                pivotMotor.move_absolute(PIVOT_OUT_POS, 100);
+                clawMotor.move_absolute(CLAW_OUT_POS, 100);
+                break;
         }
 
         pros::delay(10);

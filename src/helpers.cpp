@@ -51,12 +51,7 @@ void score(int speed) {
     intaking = true;
 }
 
-// emergency-stop for the lift and two-bar
-void stopArm() {
-    liftMotor.move(0);
-    twoBar.move(0);
-    armMoving = false;
-}
+
 
 double distanceResetX(bool right, int wallOffset) {
     double angleDistanceX = (((right ? rightDist.get() : leftDist.get()) + (right ? 3.1 : -3.1) * sin(lemlib::degToRad(chassis.getPose().theta))) / 25.4) + 5.1;
