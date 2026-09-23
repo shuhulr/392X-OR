@@ -8,9 +8,9 @@
 bool intaking = false;
 bool armMoving = false;
 
-double angular_kp = 1.62;
-double angular_ki = 0.25;
-double angular_kd = 12;
+double angular_kp = 1.03;
+double angular_ki = 0;
+double angular_kd = 0;
 
 void turnToHeadingU30(float heading, int timeout, lemlib::TurnToHeadingParams params, bool async) {
     angularController.kP = 0;

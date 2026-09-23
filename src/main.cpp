@@ -34,7 +34,7 @@ pros::Controller controller(pros::E_CONTROLLER_MASTER);
 // in a group. Keep an eye on drift/uneven power between the front and rear
 // motors; if you see it, that's likely why.
 pros::MotorGroup leftMotors({-1, -2, -3}, pros::MotorGearset::blue);  // left motor group
-pros::MotorGroup rightMotors({4, 5, 6}, pros::MotorGearset::blue);   // right motor group
+pros::MotorGroup rightMotors({8, 9, 10}, pros::MotorGearset::blue);   // right motor group
 
 // intake (port 7, reversed)
 pros::Motor intakeMotor(-7);
@@ -66,7 +66,7 @@ int gameColor = -1;
 pros::adi::Pneumatics matchloader('H', false);
 
 // Inertial Sensor (port 11)
-pros::Imu imu(11);
+pros::Imu imu(18);
 
 // tracking wheels
 // vertical odometry rotation sensor, port 9, reversed

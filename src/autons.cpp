@@ -19,6 +19,25 @@ extern bool screenTaskRunning;
 
 lemlib::Pose origin(0, 0, 0);
 
+void PIDTesting() {
+    chassis.setPose(0, 0, 0);
+    chassis.turnToHeading(90, 2000, {}, false);
+    pros::delay(2000);
+    chassis.setPose(0, 0, 0);
+    chassis.turnToHeading(90, 2000, {}, false);
+    pros::delay(2000);
+    chassis.setPose(0, 0, 0);
+    chassis.turnToHeading(90, 2000, {}, false);
+    pros::delay(2000);
+    chassis.setPose(0, 0, 0);
+    chassis.turnToHeading(90, 2000, {}, false);
+    pros::delay(2000);
+    chassis.setPose(0, 0, 0);
+    chassis.turnToHeading(90, 2000, {}, false);
+    pros::delay(2000);
+    chassis.setPose(0, 0, 0);
+    chassis.turnToHeading(90, 2000, {}, false);
+}
 // Starting poses for this season's autons go here once field setup is
 // finalized, e.g.:
 //   lemlib::Pose RightStart(x, y, heading);
@@ -26,5 +45,5 @@ lemlib::Pose origin(0, 0, 0);
 // register each auton as {"Display Name", functionPointer}. Keep at least
 // one entry so the brain screen / autonomous() never index out of bounds.
 std::vector<std::tuple<std::string, void(*)()>> autons = {
-    {"Nothing", []() {}},
+    {"PID Test", PIDTesting},
 };
