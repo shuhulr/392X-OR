@@ -31,11 +31,11 @@ extern pros::Motor intakeMotor;
 extern pros::Motor liftMotor;
 
 extern pros::Motor pivotMotor;  // claw pitch (15)
-extern pros::Motor clawMotor;   // claw rotation (-16)
+extern pros::Motor flipMotor;   // claw rotation (-16)
 
 extern pros::MotorGroup leftMotors;
 extern pros::MotorGroup rightMotors;
-extern pros::adi::Pneumatics matchloader;
+extern pros::adi::Pneumatics claw;
 extern pros::Distance leftDist;
 extern pros::Distance rightDist;
 extern pros::Distance backDist;
@@ -68,6 +68,9 @@ extern double angular_kd;
 extern void tune_kp(int target, int& oscillation);
 extern void tune_ki(int target, int& oscillation);
 extern void tune_kd(int target, int& oscillation);
+
+extern int maxRpm(pros::Motor& m);
+extern void moveToPercent(pros::Motor& m, double position, int percent);
 
 extern bool intaking;
 extern bool armMoving;

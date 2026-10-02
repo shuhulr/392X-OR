@@ -37,33 +37,47 @@ pros::MotorGroup leftMotors({-1, -2, -3}, pros::MotorGearset::blue);  // left mo
 pros::MotorGroup rightMotors({8, 9, 10}, pros::MotorGearset::blue);   // right motor group
 
 // intake (port 7, reversed)
-pros::Motor intakeMotor(-7);
+pros::Motor intakeMotor(20);
 
 // lift - cascade (port 12)
-pros::Motor liftMotor(12);
+pros::Motor liftMotor(-12);
 
 // TODO: confirm which port is pivot vs claw, and reversal
 pros::Motor pivotMotor(15);
-pros::Motor clawMotor(-16);
+pros::Motor flipMotor(-16);
 
 enum class ArmState {STOW, LOAD, PICKUP, SCORING, SCORED};
 ArmState armState = ArmState::STOW;
 
+// pneumatics
+pros::adi::Pneumatics claw('A', false, true);
+
 // TODO: tune all of these once the mechanism is built out
 constexpr double CASCADE_STOW_POS = 0;
-constexpr double CASCADE_LOAD_POS = 800;
-constexpr double CASCADE_PICKUP_POS = 700;
+constexpr double CASCADE_LOAD_POS = 900 * 1.75;
+constexpr double CASCADE_PICKUP_POS = 700 * 1.75;
 constexpr double PIVOT_OUT_POS = 0;    // stow / pickup / score
-constexpr double PIVOT_DOWN_POS = 540; // load
-constexpr double CLAW_OUT_POS = 0;
-constexpr double CLAW_DOWN_POS = -180;
+constexpr double PIVOT_DOWN_POS = 540*1.1; // load
+constexpr double CLAW_UP_POS = 0;
+constexpr double CLAW_DOWN_POS = 360 * 1.1;
 constexpr int SCORE_DROP_MS = 250;     // how long to lower after releasing R2
+
+inline int maxRpm(pros::Motor& m) {
+    switch (m.get_gearing()) {
+        case pros::MotorGears::red:   return 100;
+        case pros::MotorGears::green: return 200;
+        case pros::MotorGears::blue:  return 600;
+        default: return 200;
+    }
+}
+
+// percent is 0-100, treated as "percent of this specific motor's max RPM"
+inline void moveToPercent(pros::Motor& m, double position, int percent) {
+    m.move_absolute(position, (percent * maxRpm(m)) / 100);
+}
 
 // game color (0 for red, 1 for blue, -1 for none)
 int gameColor = -1;
-
-// pneumatics
-pros::adi::Pneumatics matchloader('H', false);
 
 // Inertial Sensor (port 11)
 pros::Imu imu(18);
@@ -226,7 +240,7 @@ void initialize() {
     // to wherever it's built to rest at startup
     liftMotor.tare_position();
     pivotMotor.tare_position();
-    clawMotor.tare_position();
+    flipMotor.tare_position();
 
     // thread for brain screen display and position logging
     pros::Task screenTask([&]() {
@@ -268,9 +282,36 @@ void autonomous() {
     std::get<1>(autons[auton])();
 }
 
-/**
- * Runs in driver control
- */
+// grid of scoring heights (raw liftMotor degrees), listed lowest -> highest
+// in the order reached while physically rising. TODO: measure real values.
+constexpr double SCORE_GRID[] = {0, 400, 800, 1200, 1600};
+constexpr int SCORE_GRID_COUNT = sizeof(SCORE_GRID) / sizeof(SCORE_GRID[0]);
+constexpr int RISE_SIGN = (SCORE_GRID[SCORE_GRID_COUNT - 1] > SCORE_GRID[0]) ? 1 : -1;
+
+constexpr double GRID_GRACE = 15;          // degrees past a rung still counted as "that" rung - TODO: tune
+constexpr uint32_t TAP_THRESHOLD_MS = 200; // release before this = "quick tap" - TODO: tune
+
+int gridFloorIndex(double pos) {
+    double signedPos = pos * RISE_SIGN;
+    int idx = 0;
+    for (int i = 0; i < SCORE_GRID_COUNT; i++) {
+        if (SCORE_GRID[i] * RISE_SIGN <= signedPos) idx = i;
+        else break;
+    }
+    return idx;
+}
+
+double computeSnapTarget(double pos, int startIdx, uint32_t holdMs) {
+    if (holdMs < TAP_THRESHOLD_MS) {
+        return SCORE_GRID[std::min(startIdx + 1, SCORE_GRID_COUNT - 1)];
+    }
+    int floorIdx = gridFloorIndex(pos);
+    double signedPos = pos * RISE_SIGN;
+    double signedFloor = SCORE_GRID[floorIdx] * RISE_SIGN;
+    if (signedPos - signedFloor <= GRID_GRACE) return SCORE_GRID[floorIdx];
+    return SCORE_GRID[std::min(floorIdx + 1, SCORE_GRID_COUNT - 1)];
+}
+
 void opcontrol() {
     chassis.setBrakeMode(pros::E_MOTOR_BRAKE_COAST);
     printf("\nDriver Control Started\n");
@@ -287,14 +328,30 @@ void opcontrol() {
         // shuhul drive
         // chassis.arcade(leftY, rightX);
 
+        // intake
+        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
+            intake(127);
+        } else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
+            intake(-128);
+        } else {
+            stopIntake();
+        }
+
+        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) claw.toggle();
+
         bool aPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A);
         bool bPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B);
         bool r2Held = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
         static uint32_t scoreDropStart = 0;
+        static ArmState lastArmState = ArmState::STOW;
+        static uint32_t r2PressStart = 0;
+        static int scoreStartIdx = 0;
+        static double scoreTarget = 0;
 
         switch (armState) {
             case ArmState::STOW:
-                if (aPressed) armState = ArmState::LOAD;
+                if (r2Held) armState = ArmState::SCORING;
+                else if (aPressed) armState = ArmState::LOAD;
                 else if (bPressed) armState = ArmState::PICKUP;
                 break;
             case ArmState::LOAD:
@@ -308,46 +365,57 @@ void opcontrol() {
                 else if (aPressed) armState = ArmState::LOAD;
                 break;
             case ArmState::SCORING:
-                if (!r2Held) {
-                    armState = ArmState::SCORED;
-                    scoreDropStart = pros::millis();
-                }
+                if (!r2Held) armState = ArmState::SCORED;
                 break;
             case ArmState::SCORED:
-                if (aPressed) armState = ArmState::STOW;
+                if (r2Held) armState = ArmState::SCORING;
+                else if (aPressed) armState = ArmState::STOW;
                 break;
         }
 
+        // grid bookkeeping: fires once on entry to SCORING, once on the
+        // SCORING -> SCORED transition
+        if (armState == ArmState::SCORING && lastArmState != ArmState::SCORING) {
+            r2PressStart = pros::millis();
+            scoreStartIdx = gridFloorIndex(liftMotor.get_position());
+        }
+        if (armState == ArmState::SCORED && lastArmState == ArmState::SCORING) {
+            scoreTarget = computeSnapTarget(liftMotor.get_position(), scoreStartIdx, pros::millis() - r2PressStart);
+        }
+        lastArmState = armState;
+
         switch (armState) {
             case ArmState::STOW:
-                liftMotor.move_absolute(CASCADE_STOW_POS, 100);
-                pivotMotor.move_absolute(PIVOT_OUT_POS, 100);
-                clawMotor.move_absolute(CLAW_OUT_POS, 100);
+                moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
+                if (fabs(pivotMotor.get_position() - PIVOT_OUT_POS) < 20) {
+                    moveToPercent(liftMotor, CASCADE_STOW_POS, 100);
+                }
                 break;
             case ArmState::LOAD:
-                liftMotor.move_absolute(CASCADE_LOAD_POS, 100);
-                pivotMotor.move_absolute(PIVOT_DOWN_POS, 100);
-                clawMotor.move_absolute(CLAW_DOWN_POS, 100);
+                moveToPercent(liftMotor, CASCADE_LOAD_POS, 100);
+                if (fabs(liftMotor.get_position() - CASCADE_LOAD_POS) < 20) {
+                    moveToPercent(pivotMotor, PIVOT_DOWN_POS, 100);
+                }
                 break;
             case ArmState::PICKUP:
-                liftMotor.move_absolute(CASCADE_PICKUP_POS, 100);
-                pivotMotor.move_absolute(PIVOT_OUT_POS, 100);
-                clawMotor.move_absolute(CLAW_OUT_POS, 100);
+                moveToPercent(liftMotor, CASCADE_PICKUP_POS, 100);
+                moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
                 break;
             case ArmState::SCORING:
-                liftMotor.move(127); // keep rising while R2 is held
-                pivotMotor.move_absolute(PIVOT_OUT_POS, 100);
-                clawMotor.move_absolute(CLAW_OUT_POS, 100);
+                liftMotor.move(127); // keep rising continuously - no per-rung stop
+                moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
                 break;
             case ArmState::SCORED:
-                if (pros::millis() - scoreDropStart <= SCORE_DROP_MS) {
-                    liftMotor.move(-80); // brief timed drop to score
-                } else {
-                    liftMotor.move(0);
-                }
-                pivotMotor.move_absolute(PIVOT_OUT_POS, 100);
-                clawMotor.move_absolute(CLAW_OUT_POS, 100);
+                moveToPercent(liftMotor, scoreTarget, 100);
+                moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
                 break;
+        }
+
+        bool downPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN);
+        static bool clawDown = false;
+        if (downPressed) {
+            clawDown = !clawDown;
+            moveToPercent(flipMotor, clawDown ? CLAW_DOWN_POS : CLAW_UP_POS, 50);
         }
 
         pros::delay(10);
