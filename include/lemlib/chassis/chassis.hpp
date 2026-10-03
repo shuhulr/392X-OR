@@ -313,7 +313,7 @@ struct MoveToPoseParams {
          * non-zero.*/
         float earlyExitRange = 0;
 
-        bool U30 = true; /** use the angularU30 PID controller when within 30 degrees of the target heading */
+        bool U40 = true; /** use the angularU40 PID controller when within 40 degrees of the target heading */
 };
 
 /**
@@ -352,14 +352,14 @@ class Chassis {
          * @param drivetrain drivetrain to be used for the chassis
          * @param lateralSettings settings for the lateral controller
          * @param angularSettings settings for the angular controller
-         * @param angularU30Settings settings for the angular controller when within 30 degrees of the target
+         * @param angularU40Settings settings for the angular controller when within 40 degrees of the target
          * @param sensors sensors to be used for odometry
          * @param throttleCurve curve applied to throttle input during driver control
          * @param turnCurve curve applied to steer input during driver control
          * @param customConstants a map of custom PID constants for the turnToPoint and turnToHeading functions. The key is the angle error threshold at which the constants will be used, and the value is a vector of the constants in the order of kp, ki, kd, windupRange.
          * @example main.cpp
          */
-        Chassis(Drivetrain drivetrain, ControllerSettings linearSettings, ControllerSettings angularSettings, ControllerSettings angularU30Settings,
+        Chassis(Drivetrain drivetrain, ControllerSettings linearSettings, ControllerSettings angularSettings, ControllerSettings angularU40Settings,
                 OdomSensors sensors, DriveCurve* throttleCurve = &defaultDriveCurve,
                 DriveCurve* steerCurve = &defaultDriveCurve, std::pmr::unordered_map<float, std::pmr::vector<float>> customConstants = {});
         /**
@@ -953,7 +953,7 @@ class Chassis {
          * @warning Do not interact with these unless you know what you are doing
          */
         PID angularPID;
-        PID angularU30PID;
+        PID angularU40PID;
     protected:
         /**
          * @brief Indicates that this motion is queued and blocks current task until this motion reaches front of queue
@@ -971,7 +971,7 @@ class Chassis {
 
         ControllerSettings lateralSettings;
         ControllerSettings angularSettings;
-        ControllerSettings angularU30Settings;
+        ControllerSettings angularU40Settings;
         Drivetrain drivetrain;
         OdomSensors sensors;
         DriveCurve* throttleCurve;
@@ -981,8 +981,8 @@ class Chassis {
         ExitCondition lateralSmallExit;
         ExitCondition angularLargeExit;
         ExitCondition angularSmallExit;
-        ExitCondition angularU30LargeExit;
-        ExitCondition angularU30SmallExit;
+        ExitCondition angularU40LargeExit;
+        ExitCondition angularU40SmallExit;
         std::pmr::unordered_map<float, std::pmr::vector<float>> customConstants;
     private:
         pros::Mutex mutex;

@@ -11,7 +11,7 @@
 // Set to 0 to fully disable the RCL (distance-sensor wall) localization
 // system at compile time. When off, none of the RCL sensors/task get
 // built, and odometry falls back to the tracking wheels instead.
-#define RCL_ENABLED 1
+#define RCL_ENABLED 0
 
 #if RCL_ENABLED
 #include "RclTracking.hpp"
@@ -21,7 +21,7 @@
 extern lemlib::Chassis chassis;
 extern lemlib::ControllerSettings linearController;
 extern lemlib::ControllerSettings angularController;
-extern lemlib::ControllerSettings angularControllerU30;
+extern lemlib::ControllerSettings angularControllerU40;
 extern pros::Controller controller;
 
 // intake (port 7, reversed)
@@ -50,7 +50,6 @@ extern RclTracking RclMain;
 
 
 // helpers.cpp
-extern void turnToHeadingU30(float heading, int timeout, lemlib::TurnToHeadingParams params = {}, bool async = true);
 extern void intake(int voltage);
 extern void moveWithVoltage(int left, int right);
 extern void stopIntake();

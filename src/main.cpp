@@ -33,7 +33,7 @@ pros::Controller controller(pros::E_CONTROLLER_MASTER);
 // #186 documents 5.5W motors not always being ratioed the same as 11W ones
 // in a group. Keep an eye on drift/uneven power between the front and rear
 // motors; if you see it, that's likely why.
-pros::MotorGroup leftMotors({-1, -2, -3}, pros::MotorGearset::blue);  // left motor group
+pros::MotorGroup leftMotors({-2, -3, -4}, pros::MotorGearset::blue);  // left motor group
 pros::MotorGroup rightMotors({8, 9, 10}, pros::MotorGearset::blue);   // right motor group
 
 // intake (port 7, reversed)
@@ -79,30 +79,30 @@ inline void moveToPercent(pros::Motor& m, double position, int percent) {
 // game color (0 for red, 1 for blue, -1 for none)
 int gameColor = -1;
 
-// Inertial Sensor (port 11)
-pros::Imu imu(18);
+// Inertial Sensor (port 61)
+pros::Imu imu(16);
 
 // tracking wheels
-// vertical odometry rotation sensor, port 9, reversed
-pros::Rotation verticalEnc(-9);
-// horizontal odometry rotation sensor, port 10, reversed
-pros::Rotation horizontalEnc(-10);
+// vertical odometry rotation sensor, port 7, reversed
+pros::Rotation verticalEnc(-7);
+// horizontal odometry rotation sensor, port 1, reversed
+pros::Rotation horizontalEnc(1);
 // horizontal tracking wheel. 2" diameter, 3.7" offset behind center (negative)
-lemlib::TrackingWheel horizontal(&horizontalEnc, 2, -3.7);
+lemlib::TrackingWheel horizontal(&horizontalEnc, 2, -4);
 // vertical tracking wheel. 2" diameter, 0.4" offset left of center (negative)
-lemlib::TrackingWheel vertical(&verticalEnc, 2, -0.4);
+lemlib::TrackingWheel vertical(&verticalEnc, 2, 0.15);
 
 // drivetrain settings
 lemlib::Drivetrain drivetrain(&leftMotors,
                               &rightMotors,
-                              11.5,                        // track width (in)
-                              lemlib::Omniwheel::NEW_325,  // 3.25" omnis
+                              12,                        // track width (in)
+                              lemlib::Omniwheel::NEW_275,  // 3.25" omnis
                               450,                          // drivetrain rpm
-                              2                             // horizontal drift
+                              8                             // horizontal drift
 );
 
 // lateral motion controller
-lemlib::ControllerSettings linearController(5.5,  // kP
+lemlib::ControllerSettings linearController(6,  // kP
                                             0.24,  // kI
                                             12,    // kD
                                             2,     // anti windup
@@ -125,10 +125,10 @@ lemlib::ControllerSettings angularController(angular_kp,
                                              0     // max acceleration (slew)
 );
 
-// secondary angular controller, used for tighter U30-class turns
-lemlib::ControllerSettings angularControllerU30(4.3,
+// secondary angular controller, used for tighter U40-class turns
+lemlib::ControllerSettings angularControllerU40(4.7,
                                              0.28,
-                                             20,
+                                             20.5,
                                              4,
                                              1,
                                              75,
@@ -153,7 +153,7 @@ lemlib::ExpoDriveCurve throttleCurve(13, 13, 1);
 lemlib::ExpoDriveCurve steerCurve(13, 13, 1);
 
 // create the chassis
-lemlib::Chassis chassis(drivetrain, linearController, angularController, angularControllerU30, sensors, &throttleCurve, &steerCurve);
+lemlib::Chassis chassis(drivetrain, linearController, angularController, angularControllerU40, sensors, &throttleCurve, &steerCurve);
 
 // distance sensors
 pros::Distance leftDist(18);
@@ -225,7 +225,7 @@ void initialize() {
     chassis.calibrate(); // calibrate sensors
 
     // TODO: update to this season's actual starting coordinates
-    chassis.setPose(-48, -48, 0);
+    chassis.setPose(0, 0, 0);
 
 #if RCL_ENABLED
     RclMain.setRclPose(chassis.getPose());
