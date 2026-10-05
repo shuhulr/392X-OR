@@ -8,21 +8,14 @@
 bool intaking = false;
 bool armMoving = false;
 
-double angular_kp = 1.62;
-double angular_ki = 0.25;
-double angular_kd = 12;
+double angular_kp = 4.7;
+double angular_ki = 0.28;
+double angular_kd = 20.5;
 
-void turnToHeadingU30(float heading, int timeout, lemlib::TurnToHeadingParams params, bool async) {
-    angularController.kP = 0;
-    angularController.kI = 0;
-    angularController.kD = 0;
-    angularController.windupRange = 5;
-    chassis.turnToHeading(heading, timeout, params, async);
-    angularController.kP = 1.62; // reset to default
-    angularController.kI = 0.25;
-    angularController.kD = 12;
-    angularController.windupRange = 5;
-}
+// double angular_kp = 1.9;
+// double angular_ki = 0.15;
+// double angular_kd = 11.6;
+
 
 void intake(int voltage) {
     intakeMotor.move(voltage);
