@@ -4,6 +4,7 @@
 #include "lemlib/chassis/chassis.hpp"
 #include "pros/adi.hpp"
 #include "pros/distance.hpp"
+#include "pros/motors.hpp"
 
 // ============================================================
 // FEATURE FLAGS
@@ -68,8 +69,20 @@ extern void tune_kp(int target, int& oscillation);
 extern void tune_ki(int target, int& oscillation);
 extern void tune_kd(int target, int& oscillation);
 
-extern int maxRpm(pros::Motor& m);
-extern void moveToPercent(pros::Motor& m, double position, int percent);
+inline int maxRpm(pros::AbstractMotor& m) {
+    switch (m.get_gearing()) {
+        case pros::MotorGears::red:   return 100;
+        case pros::MotorGears::green: return 200;
+        case pros::MotorGears::blue:  return 600;
+        default: return 200;
+    }
+}
+
+// percent is 0-100, treated as "percent of this specific motor's max RPM"
+inline void moveToPercent(pros::AbstractMotor& m, double position, int percent) {
+    m.move_absolute(position, (percent * maxRpm(m)) / 100);
+}
 
 extern bool intaking;
 extern bool armMoving;
+

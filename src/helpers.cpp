@@ -17,10 +17,6 @@ double angular_kd = 20.5;
 // double angular_kd = 11.6;
 
 
-void intake(int voltage) {
-    intakeMotor.move(voltage);
-    intaking = true;
-}
 
 void moveWithVoltage(int left, int right) {
     leftMotors.move_voltage(left * 12000 / 127);
@@ -32,10 +28,6 @@ void stopDrive() {
     rightMotors.move_voltage(0);
 }
 
-void stopIntake() {
-    intakeMotor.move(0);
-    intaking = false;
-}
 
 // outtake/score at a given speed (negative to reverse). Adjust if scoring
 // should behave differently than just running the intake backwards.

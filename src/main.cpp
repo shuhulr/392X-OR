@@ -13,9 +13,12 @@
 #include "pros/rtos.hpp"
 #include "autons.h"    // IWYU pragma: keep
 #include "globals.hpp"
+#include "pto.hpp"
 #include "pros/screen.h" // IWYU pragma: keep
 #include <algorithm> // IWYU pragma: keep
 #include <cstdio>
+#include <cmath>
+#include <cstdint>
 
 extern int auton;
 bool competitionInitialize = false;
@@ -28,75 +31,71 @@ bool screenTaskRunning = true;
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
 // motor groups
-// NOTE: ports 1 and 4 (the front motors) are 5.5W motors, while 2/3/5/6 are
-// 11W. Mixing wattages in one group is a known trouble spot - LemLib issue
+// NOTE: some drivetrain motors are 5.5W while the rest are 11W.
+// Mixing wattages in one group is a known trouble spot - LemLib issue
 // #186 documents 5.5W motors not always being ratioed the same as 11W ones
 // in a group. Keep an eye on drift/uneven power between the front and rear
 // motors; if you see it, that's likely why.
 pros::MotorGroup leftMotors({-2, -3, -4}, pros::MotorGearset::blue);  // left motor group
 pros::MotorGroup rightMotors({8, 9, 10}, pros::MotorGearset::blue);   // right motor group
 
-// intake (port 7, reversed)
-pros::Motor intakeMotor(20);
+// lift - cascade (port 12, reversed) permanent motor
+// ptoMotor switches between intake and cascade
+pros::Motor liftMotor(-12, pros::MotorGearset::green);
 
-// lift - cascade (port 12)
-pros::Motor liftMotor(-12);
-
-// TODO: confirm which port is pivot vs claw, and reversal
+// pivot (claw pitch, port 15) and flip (claw rotation, port 16 reversed)
 pros::Motor pivotMotor(15);
 pros::Motor flipMotor(-16);
 
 enum class ArmState {STOW, LOAD, PICKUP, SCORING, SCORED};
-ArmState armState = ArmState::STOW;
+ArmState armState = ArmState::LOAD;
 
 // pneumatics
 pros::adi::Pneumatics claw('A', false, true);
 
 // TODO: tune all of these once the mechanism is built out
-constexpr double CASCADE_STOW_POS = 0;
-constexpr double CASCADE_LOAD_POS = 900 * 1.75;
-constexpr double CASCADE_PICKUP_POS = 700 * 1.75;
-constexpr double PIVOT_OUT_POS = 0;    // stow / pickup / score
-constexpr double PIVOT_DOWN_POS = 540*1.1; // load
+// The bot powers on in the load pose, and initialize() tares every arm motor,
+// so each motor's 0 is its load position.
+constexpr double CASCADE_LOAD_POS = 0;
+constexpr double CASCADE_STOW_POS = -200;       // placeholder: fully down, below load
+constexpr double CASCADE_PICKUP_POS = -200 ;
+constexpr double CASCADE_TRANSITION_POS = 900;
+constexpr double PIVOT_DOWN_POS = 0;            // load (power-on pose)
+constexpr double PIVOT_OUT_POS = -540 * 1.1;    // pickup / scoring
 constexpr double CLAW_UP_POS = 0;
 constexpr double CLAW_DOWN_POS = 360 * 1.1;
-constexpr int SCORE_DROP_MS = 250;     // how long to lower after releasing R2
+bool loadPickupTransition = false;
 
-inline int maxRpm(pros::Motor& m) {
-    switch (m.get_gearing()) {
-        case pros::MotorGears::red:   return 100;
-        case pros::MotorGears::green: return 200;
-        case pros::MotorGears::blue:  return 600;
-        default: return 200;
-    }
+// move the cascade to a position; hold still while the PTO is mid-switch
+// (maxRpm / moveToPercent live in globals.hpp)
+static void liftTo(double position) {
+    if (ptoReady()) moveToPercent(liftMotor, position, 100);
+    else liftMotor.brake();
 }
 
-// percent is 0-100, treated as "percent of this specific motor's max RPM"
-inline void moveToPercent(pros::Motor& m, double position, int percent) {
-    m.move_absolute(position, (percent * maxRpm(m)) / 100);
-}
+
 
 // game color (0 for red, 1 for blue, -1 for none)
 int gameColor = -1;
 
-// Inertial Sensor (port 61)
+// Inertial Sensor (port 16)
 pros::Imu imu(16);
 
 // tracking wheels
 // vertical odometry rotation sensor, port 7, reversed
 pros::Rotation verticalEnc(-7);
-// horizontal odometry rotation sensor, port 1, reversed
+// horizontal odometry rotation sensor, port 1
 pros::Rotation horizontalEnc(1);
-// horizontal tracking wheel. 2" diameter, 3.7" offset behind center (negative)
+// horizontal tracking wheel. 2" diameter, 4" offset behind center (negative)
 lemlib::TrackingWheel horizontal(&horizontalEnc, 2, -4);
-// vertical tracking wheel. 2" diameter, 0.4" offset left of center (negative)
+// vertical tracking wheel. 2" diameter, 0.15" offset right of center (positive)
 lemlib::TrackingWheel vertical(&verticalEnc, 2, 0.15);
 
 // drivetrain settings
 lemlib::Drivetrain drivetrain(&leftMotors,
                               &rightMotors,
                               12,                        // track width (in)
-                              lemlib::Omniwheel::NEW_275,  // 3.25" omnis
+                              lemlib::Omniwheel::NEW_275,  // 2.75" omnis
                               450,                          // drivetrain rpm
                               8                             // horizontal drift
 );
@@ -236,8 +235,8 @@ void initialize() {
     // hold position when no voltage is applied, instead of coasting/falling
     liftMotor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
 
-    // zero the two-bar's position so TWO_BAR_STOW_POS/SCORE_POS are relative
-    // to wherever it's built to rest at startup
+    // zero the arm motors so every position constant is relative to the load
+    // pose - the bot must be physically in the load pose when powered on
     liftMotor.tare_position();
     pivotMotor.tare_position();
     flipMotor.tare_position();
@@ -256,7 +255,8 @@ void initialize() {
             pros::lcd::print(3, "auton index: %d", auton);
             pros::lcd::print(4, "%s", std::get<0>(autons[auton]).c_str());
             pros::lcd::print(5, "Left: %.1f  Right: %.1f", leftMotors.get_temperature(), rightMotors.get_temperature());
-            pros::lcd::print(6, "Intake: %.1f  Lift: %.1f", intakeMotor.get_temperature(), liftMotor.get_temperature());
+            pros::lcd::print(6, "PTO: %.1f  Lift: %.1f", ptoMotor.get_temperature(), liftMotor.get_temperature());
+            pros::lcd::print(7, "PTO mode: %s", ptoMode() == PtoMode::COMBINED ? "22W" : "split");
 
             // log position telemetry
             lemlib::telemetrySink()->info("Chassis pose: {}", chassis.getPose());
@@ -328,85 +328,105 @@ void opcontrol() {
         // shuhul drive
         // chassis.arcade(leftY, rightX);
 
-        // intake
-        if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1)) {
-            intake(127);
-        } else if (controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1)) {
-            intake(-128);
-        } else {
-            stopIntake();
-        }
+        
 
         if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) claw.toggle();
 
         bool aPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A);
         bool bPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B);
+        bool yPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y);
         bool r2Held = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
-        static uint32_t scoreDropStart = 0;
-        static ArmState lastArmState = ArmState::STOW;
+        bool r1Held = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
+        bool l1Held = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1);
+        static ArmState lastArmState = ArmState::LOAD;
         static uint32_t r2PressStart = 0;
         static int scoreStartIdx = 0;
         static double scoreTarget = 0;
 
-        switch (armState) {
-            case ArmState::STOW:
-                if (r2Held) armState = ArmState::SCORING;
-                else if (aPressed) armState = ArmState::LOAD;
-                else if (bPressed) armState = ArmState::PICKUP;
-                break;
-            case ArmState::LOAD:
-                if (r2Held) armState = ArmState::SCORING;
-                else if (aPressed) armState = ArmState::STOW;
-                else if (bPressed) armState = ArmState::PICKUP;
-                break;
-            case ArmState::PICKUP:
-                if (r2Held) armState = ArmState::SCORING;
-                else if (bPressed) armState = ArmState::STOW;
-                else if (aPressed) armState = ArmState::LOAD;
-                break;
-            case ArmState::SCORING:
-                if (!r2Held) armState = ArmState::SCORED;
-                break;
-            case ArmState::SCORED:
-                if (r2Held) armState = ArmState::SCORING;
-                else if (aPressed) armState = ArmState::STOW;
-                break;
+        // intake
+        if (r1Held) {
+            intake(127);
+        } else if (l1Held) {
+            intake(-127);
+        } else {
+            stopIntake();
+        }
+
+
+        // R2: hold to score from any state; releasing it moves SCORING -> SCORED
+        if (r2Held) armState = ArmState::SCORING;
+        else if (armState == ArmState::SCORING) armState = ArmState::SCORED;
+
+        // A: cancel whatever's happening and go to load.
+        // B: go to pickup; press again to go back to load.
+        if (aPressed) armState = ArmState::LOAD;
+        else if (bPressed) armState = (armState == ArmState::PICKUP) ? ArmState::LOAD : ArmState::PICKUP;
+        // Y: cancel whatever's happening and go to stow.
+        if (yPressed) armState = ArmState::STOW;
+
+        if (lastArmState == ArmState::LOAD && armState == ArmState::PICKUP) {
+            loadPickupTransition = true;
         }
 
         // grid bookkeeping: fires once on entry to SCORING, once on the
         // SCORING -> SCORED transition
         if (armState == ArmState::SCORING && lastArmState != ArmState::SCORING) {
-            r2PressStart = pros::millis();
             scoreStartIdx = gridFloorIndex(liftMotor.get_position());
+            r2PressStart = pros::millis();
         }
         if (armState == ArmState::SCORED && lastArmState == ArmState::SCORING) {
             scoreTarget = computeSnapTarget(liftMotor.get_position(), scoreStartIdx, pros::millis() - r2PressStart);
         }
         lastArmState = armState;
 
+
+
+        // PTO: go combined (22W) once the cascade passes the threshold, and stay
+        // combined until an intake button is pressed. Otherwise stay split (11W).
+        if ((liftMotor.get_position() > PTO_SPLIT_MAX_POS) || (ptoMode() == PtoMode::COMBINED && (!r1Held && !l1Held))) {
+            ptoRequest(PtoMode::COMBINED);
+        }
+        else {
+            ptoRequest(PtoMode::SPLIT);
+        }
+        ptoUpdate();
+
+
         switch (armState) {
             case ArmState::STOW:
                 moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
                 if (fabs(pivotMotor.get_position() - PIVOT_OUT_POS) < 20) {
-                    moveToPercent(liftMotor, CASCADE_STOW_POS, 100);
+                    liftTo(CASCADE_STOW_POS);
+                } else {
+                    liftMotor.brake(); // hold the cascade until the pivot has cleared
                 }
                 break;
             case ArmState::LOAD:
-                moveToPercent(liftMotor, CASCADE_LOAD_POS, 100);
+                liftTo(CASCADE_LOAD_POS);
                 if (fabs(liftMotor.get_position() - CASCADE_LOAD_POS) < 20) {
                     moveToPercent(pivotMotor, PIVOT_DOWN_POS, 100);
                 }
                 break;
             case ArmState::PICKUP:
-                moveToPercent(liftMotor, CASCADE_PICKUP_POS, 100);
-                moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
+                if (loadPickupTransition) {
+                    liftTo(CASCADE_TRANSITION_POS);
+                    if (fabs(liftMotor.get_position() - CASCADE_TRANSITION_POS) < 100) moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
+                    if (fabs(liftMotor.get_position() - CASCADE_TRANSITION_POS) < 10) loadPickupTransition = false;
+                } else {
+                    liftTo(CASCADE_PICKUP_POS);
+                    moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
+                }
                 break;
             case ArmState::SCORING:
-                liftMotor.move(127); // keep rising continuously - no per-rung stop
+                if (ptoReady()) {
+                    liftMotor.move(127); // rises in either mode; the PTO switches over when it passes the threshold
+                } else {
+                    liftMotor.brake();   // brief pause while the piston switches
+                }
                 moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
                 break;
             case ArmState::SCORED:
-                moveToPercent(liftMotor, scoreTarget, 100);
+                liftTo(scoreTarget);
                 moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
                 break;
         }
