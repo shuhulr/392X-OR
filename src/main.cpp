@@ -14,6 +14,7 @@
 #include "autons.h"    // IWYU pragma: keep
 #include "globals.hpp"
 #include "pto.hpp"
+#include "pivot.hpp"
 #include "pros/screen.h" // IWYU pragma: keep
 #include <algorithm> // IWYU pragma: keep
 #include <cstdio>
@@ -23,6 +24,11 @@
 extern int auton;
 bool competitionInitialize = false;
 bool opControl = false;
+
+// TEMPORARY CASCADE TEST MODE: set true to bypass normal arm controls and
+// command the cascade motor + PTO motor at full voltage in COMBINED mode.
+// Set back to false before normal driver practice or competition.
+constexpr bool CASCADE_TEST_MODE = false;
 
 // screen task flag
 bool screenTaskRunning = true;
@@ -36,16 +42,19 @@ pros::Controller controller(pros::E_CONTROLLER_MASTER);
 // #186 documents 5.5W motors not always being ratioed the same as 11W ones
 // in a group. Keep an eye on drift/uneven power between the front and rear
 // motors; if you see it, that's likely why.
-pros::MotorGroup leftMotors({-2, -3, -4}, pros::MotorGearset::blue);  // left motor group
-pros::MotorGroup rightMotors({8, 9, 10}, pros::MotorGearset::blue);   // right motor group
+pros::MotorGroup leftMotors({-16, -17, -18}, pros::MotorGearset::blue);  // left motor group
+pros::MotorGroup rightMotors({12, 13, 14}, pros::MotorGearset::blue);   // right motor group
 
 // lift - cascade (port 12, reversed) permanent motor
 // ptoMotor switches between intake and cascade
-pros::Motor liftMotor(-12, pros::MotorGearset::green);
+pros::Motor liftMotor(21, pros::MotorGearset::green);
 
-// pivot (claw pitch, port 15) and flip (claw rotation, port 16 reversed)
-pros::Motor pivotMotor(15);
+// pivot (claw pitch, port 6) and flip (claw rotation, port 16 reversed)
+pros::Motor pivotMotor(6);
 pros::Motor flipMotor(-16);
+
+// Dedicated pivot feedback sensor on port 9. Negative port reverses its
+// reported direction, so pivot-up should produce increasing position.
 
 enum class ArmState {STOW, LOAD, PICKUP, SCORING, SCORED};
 ArmState armState = ArmState::LOAD;
@@ -60,8 +69,9 @@ constexpr double CASCADE_LOAD_POS = 0;
 constexpr double CASCADE_STOW_POS = -200;       // placeholder: fully down, below load
 constexpr double CASCADE_PICKUP_POS = -200 ;
 constexpr double CASCADE_TRANSITION_POS = 900;
-constexpr double PIVOT_DOWN_POS = 0;            // load (power-on pose)
-constexpr double PIVOT_OUT_POS = -540 * 1.1;    // pickup / scoring
+// Pivot position control and the R2 cascade/pivot transition are implemented
+// in pivot.cpp. See pivot.hpp for the public interface and target positions.
+
 constexpr double CLAW_UP_POS = 0;
 constexpr double CLAW_DOWN_POS = 360 * 1.1;
 bool loadPickupTransition = false;
@@ -78,14 +88,14 @@ static void liftTo(double position) {
 // game color (0 for red, 1 for blue, -1 for none)
 int gameColor = -1;
 
-// Inertial Sensor (port 16)
-pros::Imu imu(16);
+// Inertial Sensor (port 7)
+pros::Imu imu(7);
 
 // tracking wheels
 // vertical odometry rotation sensor, port 7, reversed
-pros::Rotation verticalEnc(-7);
-// horizontal odometry rotation sensor, port 1
-pros::Rotation horizontalEnc(1);
+pros::Rotation verticalEnc(-13);
+// horizontal odometry rotation sensor, port 10, reversed
+pros::Rotation horizontalEnc(-10);
 // horizontal tracking wheel. 2" diameter, 4" offset behind center (negative)
 lemlib::TrackingWheel horizontal(&horizontalEnc, 2, -4);
 // vertical tracking wheel. 2" diameter, 0.15" offset right of center (positive)
@@ -238,8 +248,10 @@ void initialize() {
     // zero the arm motors so every position constant is relative to the load
     // pose - the bot must be physically in the load pose when powered on
     liftMotor.tare_position();
-    pivotMotor.tare_position();
+    pivotMotor.tare_position(); // retained for diagnostics; pivot feedback lives in pivot.cpp
     flipMotor.tare_position();
+    pivotInitialize(); // robot must be physically in LOAD pose here
+    pivotMotor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
 
     // thread for brain screen display and position logging
     pros::Task screenTask([&]() {
@@ -318,6 +330,27 @@ void opcontrol() {
     opControl = true;
 
     while (true) {
+        // Isolated cascade test: stop drivetrain, engage the PTO, then run both
+        // cascade motors at full voltage. Wait safely while the PTO is switching.
+        if (CASCADE_TEST_MODE) {
+            chassis.arcade(0, 0);
+            ptoRequest(PtoMode::COMBINED);
+            ptoUpdate();
+
+            if (ptoReady() && ptoMode() == PtoMode::COMBINED) {
+                liftMotor.move_voltage(12000);
+                // In COMBINED mode, ptoUpdate makes ptoMotor follow the lift
+                // motor's applied voltage using the configured PTO_FOLLOW_SIGN.
+                ptoUpdate();
+            } else {
+                liftMotor.move(0);
+                ptoMotor.move(0);
+            }
+
+            pros::delay(10);
+            continue; // bypass all normal driver-control commands in test mode
+        }
+
         int leftX = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
         int leftY = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_Y);
         int rightX = controller.get_analog(pros::E_CONTROLLER_ANALOG_RIGHT_X);
@@ -342,6 +375,7 @@ void opcontrol() {
         static uint32_t r2PressStart = 0;
         static int scoreStartIdx = 0;
         static double scoreTarget = 0;
+        static bool scoringTransitionActive = false;
 
         // intake
         if (r1Held) {
@@ -366,16 +400,25 @@ void opcontrol() {
 
         if (lastArmState == ArmState::LOAD && armState == ArmState::PICKUP) {
             loadPickupTransition = true;
+        } else if (armState != ArmState::PICKUP) {
+            loadPickupTransition = false; // cancelled: don't leave it armed
         }
 
-        // grid bookkeeping: fires once on entry to SCORING, once on the
-        // SCORING -> SCORED transition
+        // On the R2 edge, begin the coordinated lift-first, then simultaneous
+        // lift + pivot transition managed by pivot.cpp.
         if (armState == ArmState::SCORING && lastArmState != ArmState::SCORING) {
+            scoringTransitionActive = pivotBeginScoringTransition();
             scoreStartIdx = gridFloorIndex(liftMotor.get_position());
             r2PressStart = pros::millis();
         }
         if (armState == ArmState::SCORED && lastArmState == ArmState::SCORING) {
             scoreTarget = computeSnapTarget(liftMotor.get_position(), scoreStartIdx, pros::millis() - r2PressStart);
+            scoringTransitionActive = false;
+            pivotCancelScoringTransition();
+        } else if (armState != ArmState::SCORING) {
+            // A/B/Y can cancel the transition at any time.
+            scoringTransitionActive = false;
+            pivotCancelScoringTransition();
         }
         lastArmState = armState;
 
@@ -394,8 +437,8 @@ void opcontrol() {
 
         switch (armState) {
             case ArmState::STOW:
-                moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
-                if (fabs(pivotMotor.get_position() - PIVOT_OUT_POS) < 20) {
+                pivotTo(PIVOT_OUT_POS, 100);
+                if (fabs(pivotPositionDegrees() - PIVOT_OUT_POS) < 20) {
                     liftTo(CASCADE_STOW_POS);
                 } else {
                     liftMotor.brake(); // hold the cascade until the pivot has cleared
@@ -404,30 +447,46 @@ void opcontrol() {
             case ArmState::LOAD:
                 liftTo(CASCADE_LOAD_POS);
                 if (fabs(liftMotor.get_position() - CASCADE_LOAD_POS) < 20) {
-                    moveToPercent(pivotMotor, PIVOT_DOWN_POS, 100);
+                    pivotTo(PIVOT_DOWN_POS, 100);
                 }
                 break;
             case ArmState::PICKUP:
                 if (loadPickupTransition) {
                     liftTo(CASCADE_TRANSITION_POS);
-                    if (fabs(liftMotor.get_position() - CASCADE_TRANSITION_POS) < 100) moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
-                    if (fabs(liftMotor.get_position() - CASCADE_TRANSITION_POS) < 10) loadPickupTransition = false;
+                    if (fabs(liftMotor.get_position() - CASCADE_TRANSITION_POS) < 100) {
+                        pivotTo(PIVOT_OUT_POS, 100);
+                    }
+                    if (fabs(pivotPositionDegrees() - PIVOT_OUT_POS) < 20) {
+                        loadPickupTransition = false; // pivot is out, now it's safe to lower
+                    }
                 } else {
                     liftTo(CASCADE_PICKUP_POS);
-                    moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
+                    pivotTo(PIVOT_OUT_POS, 100);
                 }
                 break;
-            case ArmState::SCORING:
+            case ArmState::SCORING: {
+                if (scoringTransitionActive) {
+                    PivotTransitionStatus status = pivotUpdateScoringTransition();
+                    if (status == PivotTransitionStatus::RUNNING) {
+                        break; // pivot.cpp is commanding both lift and pivot this loop
+                    }
+                    // COMPLETE or TIMED_OUT: hand off immediately to regular scoring.
+                    scoringTransitionActive = false;
+                }
+
+                // Regular scoring behavior. This is also the fallback if the
+                // coordinated transition reaches its timeout before the pivot clears.
                 if (ptoReady()) {
-                    liftMotor.move(127); // rises in either mode; the PTO switches over when it passes the threshold
+                    liftMotor.move(127);
                 } else {
-                    liftMotor.brake();   // brief pause while the piston switches
+                    liftMotor.brake();
                 }
-                moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
+                pivotTo(PIVOT_OUT_POS, 100);
                 break;
+            }
             case ArmState::SCORED:
                 liftTo(scoreTarget);
-                moveToPercent(pivotMotor, PIVOT_OUT_POS, 100);
+                pivotTo(PIVOT_OUT_POS, 100);
                 break;
         }
 
