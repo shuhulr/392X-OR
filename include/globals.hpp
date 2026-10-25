@@ -83,6 +83,25 @@ inline void moveToPercent(pros::AbstractMotor& m, double position, int percent) 
     m.move_absolute(position, (percent * maxRpm(m)) / 100);
 }
 
+void liftTo(double position);
+
 extern bool intaking;
 extern bool armMoving;
+extern void liftTo(double position);
 
+extern const int PTO_MOTOR_PORT;                // negative means reversed; sign that runs the intake in
+extern const char PTO_PISTON_PORT;
+extern const bool PTO_COMBINED_WHEN_EXTENDED; // piston extended = both motors on the cascade
+extern const int PTO_FOLLOW_SIGN;                // -1 if ptoMotor must spin opposite liftMotor to also push the cascade up
+extern const uint32_t PTO_SWITCH_MS;
+
+
+// Starting pose: claw is physically in LOAD, but the cascade string is unwound.
+// After the match starts, wind the cascade to the previous STOW motor target.
+// !TODO
+inline constexpr double CASCADE_LOAD_POS = 700;
+inline constexpr double CASCADE_STOW_POS = 700;       // placeholder: fully down, below load
+inline constexpr double CASCADE_PICKUP_POS = 200 ;
+inline constexpr double CASCADE_TRANSITION_POS = 900;   
+
+extern const double SCORE_GRID[];

@@ -10,6 +10,7 @@ enum class PtoMode { SPLIT, COMBINED };
 extern double PTO_SPLIT_MAX_POS;
 
 extern pros::Motor ptoMotor;
+extern pros::adi::Pneumatics ptoPiston;
 
 // ptoRequest() with the mode you want then ptoUpdate().
 // ptoUpdate() runs the switch (piston + settle time) and, in COMBINED, makes

@@ -11,7 +11,7 @@
 
 namespace {
 // Negative port reverses the sensor direction so pivot-up reads as increasing.
-pros::Rotation pivotRotation(-9);
+pros::Rotation pivotRotation(-3);
 
 // Pivot feedback controller. The motor and sensor rotate in opposite reported
 // directions on this robot, so the voltage sign is inverted below.
@@ -54,7 +54,7 @@ void transitionLiftSlowly() {
 } // namespace
 
 void pivotInitialize() {
-    pivotRotation.reset_position(); // robot must physically be in LOAD pose
+    pivotRotation.set_position(500); // LOAD pose is the 5-degree reference (centidegrees)
     transitionActive = false;
 }
 
