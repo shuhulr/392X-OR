@@ -63,7 +63,7 @@ void ptoUpdate() {
         ptoMotor.move_voltage(liftMotor.get_voltage() * PTO_FOLLOW_SIGN);
     }
 }
-
+  
 void intake(int voltage) {
     if (current != PtoMode::SPLIT || switching) return;
     ptoMotor.move(voltage);

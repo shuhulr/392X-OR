@@ -94,7 +94,7 @@ extern const char PTO_PISTON_PORT;
 extern const bool PTO_COMBINED_WHEN_EXTENDED; // piston extended = both motors on the cascade
 extern const int PTO_FOLLOW_SIGN;                // -1 if ptoMotor must spin opposite liftMotor to also push the cascade up
 extern const uint32_t PTO_SWITCH_MS;
-
+  
 
 // Starting pose: claw is physically in LOAD, but the cascade string is unwound.
 // After the match starts, wind the cascade to the previous STOW motor target.

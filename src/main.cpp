@@ -125,11 +125,11 @@ pros::Imu imu(7);
 // vertical odometry rotation sensor, port 7, reversed
 pros::Rotation verticalEnc(-15);
 // horizontal odometry rotation sensor, port 10, reversed
-pros::Rotation horizontalEnc(-10);
+pros::Rotation horizontalEnc(10);
 // horizontal tracking wheel. 2" diameter, 4" offset behind center (negative)
-lemlib::TrackingWheel horizontal(&horizontalEnc, 2, -4);
+lemlib::TrackingWheel horizontal(&horizontalEnc, 2, -3.8);
 // vertical tracking wheel. 2" diameter, 0.15" offset right of center (positive)
-lemlib::TrackingWheel vertical(&verticalEnc, 2, 0.15);
+lemlib::TrackingWheel vertical(&verticalEnc, 2, -0.3);
 
 // drivetrain settings
 lemlib::Drivetrain drivetrain(&leftMotors,
@@ -255,7 +255,7 @@ void initialize() {
         printf("Loaded Auton: %s\n", buf);
         fclose(file);
     } else {
-        auton = 0; // default if no file is found
+        auton = 1; // default if no file is found
         printf("SD Card not found, defaulting to auton 0\n");
     }
 
@@ -374,7 +374,7 @@ void opcontrol() {
         // shuhul drive
         // chassis.arcade(leftY, rightX);
 
-        
+          
 
         if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) claw.toggle();
 
@@ -478,10 +478,10 @@ void opcontrol() {
                 }
                 break;
             case ArmState::LOAD:
+                
+                pivotTo(PIVOT_DOWN_POS, 100);
+
                 liftTo(CASCADE_LOAD_POS);
-                if (fabs(liftMotor.get_position() - CASCADE_LOAD_POS) < 20) {
-                    pivotTo(PIVOT_DOWN_POS, 100);
-                }
                 break;
             case ArmState::PICKUP:
                 if (loadPickupTransition) {
@@ -519,7 +519,7 @@ void opcontrol() {
             }
             case ArmState::SCORED:
                 if (l2Held) {
-                    liftTo(scoreTarget);
+                    liftTo(CASCADE_PICKUP_POS);
                     pivotTo(PIVOT_OUT_POS, 100);
                 } else {
                     liftMotor.brake();
@@ -531,7 +531,7 @@ void opcontrol() {
         static bool clawDown = false;
         if (downPressed && armState != ArmState::LOAD) {
             clawDown = !clawDown;
-            moveToPercent(flipMotor, clawDown ? CLAW_DOWN_POS : CLAW_UP_POS, 50);
+            moveToPercent(flipMotor, clawDown ? CLAW_DOWN_POS : CLAW_UP_POS, 70);
         }
         if ((fabs(flipMotor.get_position() - CLAW_DOWN_POS) < 10) && clawDown || (fabs(flipMotor.get_position() - CLAW_DOWN_POS) < 10) && !clawDown) {
             flipMotor.brake();

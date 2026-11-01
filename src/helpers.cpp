@@ -8,13 +8,9 @@
 bool intaking = false;
 bool armMoving = false;
 
-double angular_kp = 4.7;
-double angular_ki = 0.28;
-double angular_kd = 20.5;
-
-// double angular_kp = 1.9;
-// double angular_ki = 0.15;
-// double angular_kd = 11.6;
+double angular_kp = 1.9;
+double angular_ki = 0.15;
+double angular_kd = 11.6;
 
 
 

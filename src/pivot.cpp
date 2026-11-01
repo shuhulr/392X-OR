@@ -16,7 +16,7 @@ pros::Rotation pivotRotation(-3);
 // Pivot feedback controller. The motor and sensor rotate in opposite reported
 // directions on this robot, so the voltage sign is inverted below.
 constexpr double PIVOT_KP_MV_PER_DEG = 110.0;
-constexpr double PIVOT_TOLERANCE_DEG = 2.0;
+constexpr double PIVOT_TOLERANCE_DEG = 5.0;
 constexpr double PIVOT_MIN_MV = 1200.0;
 constexpr double PIVOT_MAX_MV = 12000.0;
 
@@ -34,6 +34,9 @@ bool transitionActive = false;
 uint32_t transitionStartMs = 0;
 uint32_t lastUpdateMs = 0;
 double transitionStartPivot = 0.0;
+
+double pivotTarget = PIVOT_DOWN_POS;
+int pivotTargetMaxPercent = 100;
 
 // Ease-in/ease-out-ish trajectory used for the pivot target.
 double trajectoryProgress(double t) {
@@ -64,21 +67,42 @@ double pivotPositionDegrees() {
 }
 
 void pivotTo(double targetDegrees, int maxPercent) {
-    const double error = targetDegrees - pivotPositionDegrees();
+    pivotTarget = targetDegrees;
+    pivotTargetMaxPercent = std::clamp(maxPercent, 0, 100);
+    applyPivotTarget();
+}
+
+void pivotUpdateControl() {
+    applyPivotTarget();
+}
+   
+void applyPivotTarget() {
+    const double error = pivotTarget - pivotPositionDegrees();
+
     if (std::fabs(error) <= PIVOT_TOLERANCE_DEG) {
         pivotMotor.move_voltage(0);
         return;
     }
 
     double voltage = -error * PIVOT_KP_MV_PER_DEG;
-    const double maxVoltage = PIVOT_MAX_MV * std::clamp(maxPercent, 0, 100) / 100.0;
+
+    const double maxVoltage =
+        PIVOT_MAX_MV * pivotTargetMaxPercent / 100.0;
+
     voltage = std::clamp(voltage, -maxVoltage, maxVoltage);
 
-    // Minimum voltage helps overcome static friction while respecting the cap.
     if (std::fabs(voltage) < PIVOT_MIN_MV) {
-        voltage = std::copysign(std::min(PIVOT_MIN_MV, maxVoltage), voltage);
+        voltage = std::copysign(
+            std::min(PIVOT_MIN_MV, maxVoltage), voltage
+        );
     }
+
     pivotMotor.move_voltage(static_cast<std::int32_t>(voltage));
+    printf("Target: %.2f | Position: %.2f | Error: %.2f, Voltage: %lf\n",
+       pivotTarget,
+       pivotPositionDegrees(),
+       pivotTarget - pivotPositionDegrees(),
+        voltage);
 }
 
 bool pivotBeginScoringTransition() {
@@ -140,4 +164,27 @@ PivotTransitionStatus pivotUpdateScoringTransition() {
 
 void pivotCancelScoringTransition() {
     transitionActive = false;
+}
+
+bool pivotMoveAbsolute(double targetDegrees,
+                       int maxPercent,
+                       uint32_t timeoutMs) {
+    const uint32_t start = pros::millis();
+
+    while (pros::millis() - start < timeoutMs) {
+        const double position = pivotPositionDegrees();
+        const double error = targetDegrees - position;
+
+        if (std::fabs(error) <= PIVOT_TOLERANCE_DEG) {
+            pivotMotor.move_voltage(0);
+            return true;
+        }
+
+        pivotTo(targetDegrees, maxPercent);
+        pros::delay(10);
+    }
+
+    // Stop actively driving if the move times out.
+    pivotMotor.move_voltage(0);
+    return false;
 }

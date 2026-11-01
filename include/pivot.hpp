@@ -28,3 +28,9 @@ bool pivotBeginScoringTransition();
 // scoring behavior should take over.
 PivotTransitionStatus pivotUpdateScoringTransition();
 void pivotCancelScoringTransition();
+
+// Reapply the most recently requested pivot target.
+// Intended to be called repeatedly by the autonomous background task.
+void pivotUpdateControl();
+
+void applyPivotTarget();
