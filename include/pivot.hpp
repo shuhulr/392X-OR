@@ -3,9 +3,10 @@
 #include <cstdint>
 
 // The rotation sensor is zeroed in the robot's LOAD pose during initialize().
-constexpr double PIVOT_DOWN_POS = 5.0;
+constexpr double PIVOT_DOWN_POS = 0.0;
 // constexpr double PIVOT_TRANSITION_POS = 35.0;
 constexpr double PIVOT_OUT_POS = 95.0;
+constexpr double PIVOT_PICKUP_POS = 80.0;
 
 enum class PivotTransitionStatus {
     IDLE,

@@ -37,6 +37,7 @@ extern pros::Motor flipMotor;   // claw rotation (-16)
 extern pros::MotorGroup leftMotors;
 extern pros::MotorGroup rightMotors;
 extern pros::adi::Pneumatics claw;
+extern pros::adi::Pneumatics toggler;
 extern pros::Distance leftDist;
 extern pros::Distance rightDist;
 extern pros::Distance backDist;
@@ -101,7 +102,13 @@ extern const uint32_t PTO_SWITCH_MS;
 // !TODO
 inline constexpr double CASCADE_LOAD_POS = 700;
 inline constexpr double CASCADE_STOW_POS = 700;       // placeholder: fully down, below load
-inline constexpr double CASCADE_PICKUP_POS = 200 ;
-inline constexpr double CASCADE_TRANSITION_POS = 900;   
+inline constexpr double CASCADE_PICKUP_POS = 170 ;
+inline constexpr double CASCADE_TRANSITION_POS = 2300;   
 
 extern const double SCORE_GRID[];
+
+// Retained scoring targets from the old SCORE_GRID: SCORE_GRID[1] was 400.
+// The higher target preserves the old +30 motor-degree offset. Calibrate on robot.
+constexpr double SCORE_LOW_POS = 0;
+constexpr double SCORE_HIGH_POS = 1100;
+

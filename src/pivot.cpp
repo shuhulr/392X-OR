@@ -11,7 +11,7 @@
 
 namespace {
 // Negative port reverses the sensor direction so pivot-up reads as increasing.
-pros::Rotation pivotRotation(-3);
+pros::Rotation pivotRotation(19);
 
 // Pivot feedback controller. The motor and sensor rotate in opposite reported
 // directions on this robot, so the voltage sign is inverted below.
@@ -23,10 +23,10 @@ constexpr double PIVOT_MAX_MV = 12000.0;
 // Transition tuning: the cascade gets a short head start, then keeps rising
 // slowly while the pivot swings out. It completes on measured pivot position,
 // not just elapsed time, and has a timeout as a fallback.
-constexpr uint32_t PIVOT_LIFT_HEADSTART_MS = 250;
+constexpr uint32_t PIVOT_LIFT_HEADSTART_MS = 650;
 constexpr uint32_t PIVOT_RAMP_MS = 1000;
 constexpr uint32_t TRANSITION_TIMEOUT_MS = 2200;
-constexpr int TRANSITION_LIFT_SPEED = 55; // PROS move() range: -127..127
+constexpr int TRANSITION_LIFT_SPEED = 65; // PROS move() range: -127..127
 constexpr int TRANSITION_PIVOT_MAX_PERCENT = 70;
 constexpr double TRANSITION_COMPLETE_TOLERANCE_DEG = 3.0;
 
@@ -57,13 +57,16 @@ void transitionLiftSlowly() {
 } // namespace
 
 void pivotInitialize() {
-    pivotRotation.set_position(500); // LOAD pose is the 5-degree reference (centidegrees)
+    pivotRotation.set_position(500);
+    pivotMotor.set_encoder_units(pros::motor_encoder_units_e::E_MOTOR_ENCODER_DEGREES);
+    pivotMotor.set_zero_position(5); // LOAD pose is the 5-degree reference (centidegrees)
     transitionActive = false;
 }
 
 double pivotPositionDegrees() {
     // PROS Rotation::get_position() returns centidegrees.
     return pivotRotation.get_position() / 100.0;
+    // return pivotMotor.get_position() / (-3);
 }
 
 void pivotTo(double targetDegrees, int maxPercent) {
@@ -98,11 +101,7 @@ void applyPivotTarget() {
     }
 
     pivotMotor.move_voltage(static_cast<std::int32_t>(voltage));
-    printf("Target: %.2f | Position: %.2f | Error: %.2f, Voltage: %lf\n",
-       pivotTarget,
-       pivotPositionDegrees(),
-       pivotTarget - pivotPositionDegrees(),
-        voltage);
+    printf("Target: %.2f | Position: %.2f | Error: %.2f, Voltage: %lf\n",pivotTarget,pivotPositionDegrees(),pivotTarget - pivotPositionDegrees(),voltage);
 }
 
 bool pivotBeginScoringTransition() {
@@ -154,7 +153,7 @@ PivotTransitionStatus pivotUpdateScoringTransition() {
         pivotTo(pivotTarget, TRANSITION_PIVOT_MAX_PERCENT);
     }
 
-    if (std::fabs(PIVOT_OUT_POS - pivotPositionDegrees()) <= TRANSITION_COMPLETE_TOLERANCE_DEG) {
+    if (std::fabs(PIVOT_OUT_POS/2 - pivotPositionDegrees()) <= TRANSITION_COMPLETE_TOLERANCE_DEG) {
         transitionActive = false;
         return PivotTransitionStatus::COMPLETE;
     }

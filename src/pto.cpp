@@ -17,7 +17,7 @@ double PTO_SPLIT_MAX_POS = 1300;
 
 pros::Motor ptoMotor(PTO_MOTOR_PORT, pros::MotorGearset::green);
 // the bot powers on in the load pose, so the PTO starts in SPLIT
-pros::adi::Pneumatics ptoPiston(PTO_PISTON_PORT, !PTO_COMBINED_WHEN_EXTENDED);
+pros::adi::Pneumatics ptoPiston(PTO_PISTON_PORT, !PTO_COMBINED_WHEN_EXTENDED, true);
 
 static PtoMode current = PtoMode::SPLIT; // engaged mode
 static PtoMode wantedMode = PtoMode::SPLIT;
