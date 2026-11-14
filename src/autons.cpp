@@ -332,18 +332,18 @@ void leftDominant() {
     pros::delay(420);
 
     // toggle 1
-    moveWithVoltage(45, 45);
+    moveWithVoltage(50, 50);
     pros::delay(400);
     pros::Task transfer(transferTask);
     moveWithVoltage(-35,-35);
-    pros::delay(400);
+    pros::delay(450);
 
     // toggle 2
-    moveWithVoltage(45,45);
+    moveWithVoltage(50,50);
     pros::delay(400);
     
     chassis.moveDistance(-6, 250, {.forwards=false}, false); 
-    chassis.moveToPoint(0, -48, 800, {.forwards=false}, false);
+    chassis.moveToPoint(0, -48, 650, {.forwards=false}, false);
 
     // chassis.waitUntilDone();
 
@@ -358,7 +358,7 @@ void leftDominant() {
     printf("%lf",pivotPositionDegrees());
     
     transferTaskOn = false;
-    liftTo(SCORE_LOW_POS+1400);
+    liftTo(SCORE_LOW_POS+200);
 
 
     // Approach the scoring point while the cascade continues toward height.
@@ -371,6 +371,7 @@ void leftDominant() {
     moveWithVoltage(-20, -20);
     pros::delay(350);
     stopDrive();
+    chassis.moveDistance(2, 300, {}, true);
 
     pivotTo(PIVOT_OUT_POS, 50);
     liftTo(SCORE_LOW_POS);
@@ -396,7 +397,7 @@ void leftDominant() {
     claw.extend();
     pros::delay(100);
 
-    liftTo(SCORE_LOW_POS+2400+1200);
+    liftTo(SCORE_LOW_POS+650);
     pivotTo(PIVOT_OUT_POS, 100);
     chassis.moveToPoint(24, -24, 500, {.forwards=false}, false);
     chassis.turnToPoint(24, -48, 600, {.forwards=false}, false);
@@ -413,7 +414,7 @@ void leftDominant() {
     stopDrive();
 
     pivotTo(PIVOT_OUT_POS, 50);
-    liftTo(SCORE_LOW_POS+2000);
+    liftTo(SCORE_LOW_POS+300);
     pros::delay(400);
     claw.retract();
     printf("%lf",pivotPositionDegrees());
@@ -439,7 +440,7 @@ void leftDominant() {
     claw.extend();
     pros::delay(100);
 
-    liftTo(SCORE_LOW_POS+2000+2000+1200);
+    liftTo(SCORE_LOW_POS+800);
     pivotTo(PIVOT_OUT_POS, 100);
     chassis.moveToPoint(48, -48, 500, {.forwards=false}, false);
     chassis.turnToPoint(24, -48, 600, {.forwards=false}, false);
@@ -457,7 +458,7 @@ void leftDominant() {
     stopDrive();
 
     pivotTo(PIVOT_OUT_POS, 50);
-    liftTo(SCORE_LOW_POS+2000+2000);
+    liftTo(SCORE_LOW_POS+500);
     pros::delay(400);
     claw.retract();
     printf("%lf",pivotPositionDegrees());
@@ -492,7 +493,7 @@ void leftDominant() {
 }
 
 void rightDominant() {
-        // The robot should start physically in LOAD, matching pivotInitialize().
+    // The robot should start physically in LOAD, matching pivotInitialize().
     pros::Task updateTask(task);
     chassis.setPose(0, -62.75, 180);
     pivotInitialize();
@@ -501,22 +502,22 @@ void rightDominant() {
     claw.extend();
     
     toggler.extend();
-    moveWithVoltage(-30,-30);
-    pros::delay(400);
+    moveWithVoltage(-35,-35);
+    pros::delay(420);
 
     // toggle 1
-    moveWithVoltage(50,50);
+    moveWithVoltage(50, 50);
     pros::delay(400);
-    moveWithVoltage(-40,-40);
-    pros::delay(350);
+    pros::Task transfer(transferTask);
+    moveWithVoltage(-35,-35);
+    pros::delay(450);
 
     // toggle 2
     moveWithVoltage(50,50);
-    pros::delay(350);
+    pros::delay(400);
     
-    pros::Task transfer(transferTask);
-    chassis.moveDistance(-6, 300, {.forwards=false}, false); 
-    chassis.moveToPoint(0, -48, 900, {.forwards=false}, false);
+    chassis.moveDistance(-6, 250, {.forwards=false}, false); 
+    chassis.moveToPoint(0, -48, 650, {.forwards=false}, false);
 
     // chassis.waitUntilDone();
 
@@ -526,12 +527,12 @@ void rightDominant() {
     // Face the scoring location, then command the pivot straight to scoring.
 
     
-    chassis.turnToPoint(-24, -48, 1000, {.forwards=false}, false);
+    chassis.turnToPoint(-24, -48, 600, {.forwards=false}, false);
     // chassis.waitUntilDone();
     printf("%lf",pivotPositionDegrees());
     
     transferTaskOn = false;
-    liftTo(SCORE_LOW_POS+1200);
+    liftTo(SCORE_LOW_POS+200);
 
 
     // Approach the scoring point while the cascade continues toward height.
@@ -542,12 +543,13 @@ void rightDominant() {
 
     // Final small contact/settling movement.
     moveWithVoltage(-20, -20);
-    pros::delay(400);
+    pros::delay(350);
     stopDrive();
+    chassis.moveDistance(2, 300, {}, true);
 
     pivotTo(PIVOT_OUT_POS, 50);
     liftTo(SCORE_LOW_POS);
-    pros::delay(400);
+    pros::delay(450);
     claw.retract();
     printf("%lf",pivotPositionDegrees());
     
@@ -561,7 +563,7 @@ void rightDominant() {
     pivotTo(PIVOT_OUT_POS, 100);
     
     chassis.moveDistance(-24, 800, {.forwards=false}, true);
-    chassis.waitUntil(13);
+    chassis.waitUntil(17);
     chassis.cancelMotion();
     moveWithVoltage(-20, -20);
 
@@ -569,10 +571,10 @@ void rightDominant() {
     claw.extend();
     pros::delay(100);
 
-    liftTo(SCORE_LOW_POS+2400+1200);
+    liftTo(SCORE_LOW_POS+650);
     pivotTo(PIVOT_OUT_POS, 100);
     chassis.moveToPoint(-24, -24, 500, {.forwards=false}, false);
-    chassis.turnToPoint(-24, -48, 700, {.forwards=false}, false);
+    chassis.turnToPoint(-24, -48, 600, {.forwards=false}, false);
 
 
     //!TODO CHANGE TO POINT LATER
@@ -586,7 +588,7 @@ void rightDominant() {
     stopDrive();
 
     pivotTo(PIVOT_OUT_POS, 50);
-    liftTo(SCORE_LOW_POS+2000);
+    liftTo(SCORE_LOW_POS+300);
     pros::delay(400);
     claw.retract();
     printf("%lf",pivotPositionDegrees());
@@ -612,25 +614,25 @@ void rightDominant() {
     claw.extend();
     pros::delay(100);
 
-    liftTo(SCORE_LOW_POS+2000+2000+1200);
+    liftTo(SCORE_LOW_POS+800);
     pivotTo(PIVOT_OUT_POS, 100);
     chassis.moveToPoint(-48, -48, 500, {.forwards=false}, false);
-    chassis.turnToPoint(-24, -48, 700, {.forwards=false}, false);
+    chassis.turnToPoint(-24, -48, 600, {.forwards=false}, false);
 
 
     //!TODO CHANGE TO POINT LATER
     chassis.moveDistance(-20, 800, {.forwards=false});
-    chassis.waitUntil(17);
+    chassis.waitUntil(14);
     chassis.cancelMotion();
 
  
     // Final small contact/settling movement.
     moveWithVoltage(-20, -20);
-    pros::delay(400);
+    pros::delay(600);
     stopDrive();
 
     pivotTo(PIVOT_OUT_POS, 50);
-    liftTo(SCORE_LOW_POS+2000+2000);
+    liftTo(SCORE_LOW_POS+500);
     pros::delay(400);
     claw.retract();
     printf("%lf",pivotPositionDegrees());

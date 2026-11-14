@@ -3,7 +3,7 @@
 #include "pros/rtos.hpp"
 #include <cstdint>
 
-constexpr int PTO_MOTOR_PORT = -11;                // negative means reversed; sign that runs the intake in
+constexpr int PTO_MOTOR_PORT = 11;                // negative means reversed; sign that runs the intake in
 constexpr char PTO_PISTON_PORT = 'C';
 constexpr bool PTO_COMBINED_WHEN_EXTENDED = true; // piston extended = both motors on the cascade
 constexpr int PTO_FOLLOW_SIGN = -1;                // -1 if ptoMotor must spin opposite liftMotor to also push the cascade up

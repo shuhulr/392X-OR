@@ -252,6 +252,8 @@ void initialize() {
     
     pivotMotor.set_encoder_units(pros::v5::MotorEncoderUnits::degrees);
     flipMotor.set_encoder_units(pros::v5::MotorEncoderUnits::degrees);
+    liftMotor.set_encoder_units(pros::v5::MotorEncoderUnits::degrees);
+    
 #if RCL_ENABLED
     RclMain.startTracking();
 #endif
@@ -309,7 +311,7 @@ void initialize() {
             pros::lcd::print(3, "auton index: %d", auton);
             pros::lcd::print(4, "%s", std::get<0>(autons[auton]).c_str());
             pros::lcd::print(5, "Left: %.1f  Right: %.1f", leftMotors.get_temperature(), rightMotors.get_temperature());
-            pros::lcd::print(6, "PTO: %.1f  Lift: %.1f", ptoMotor.get_temperature(), liftMotor.get_temperature());
+            pros::lcd::print(6, "Pivot: %.1f  Lift: %.1f", pivotPositionDegrees(), liftMotor.get_position());
             //pros::lcd::print(7, "PTO mode: %s", ptoMode() == PtoMode::COMBINED ? "22W" : "split");
             //pros::lcd::print(7, "liftMotor position: %.2lf", liftMotor.get_position());
 
@@ -496,25 +498,29 @@ void opcontrol() {
             case ArmState::LOAD:
                 if (!loadTransitionReached) {
                     liftTo(CASCADE_TRANSITION_POS);
-                }
-                if (fabs(liftMotor.get_position() - CASCADE_TRANSITION_POS) < 100) {
-                    loadTransitionReached = true;
+                } else {
                     pivotTo(PIVOT_DOWN_POS, 100);
                     liftTo(CASCADE_LOAD_POS);
+                }
+                if (fabs(liftMotor.get_position() - CASCADE_TRANSITION_POS) < 10) {
+                    loadTransitionReached = true;
                 }
                 break;
             case ArmState::PICKUP:
                 if (loadPickupTransition) {
                     liftTo(CASCADE_TRANSITION_POS);
-                    if (fabs(liftMotor.get_position() - CASCADE_TRANSITION_POS) < 100) {
+                    if (fabs(liftMotor.get_position() - CASCADE_TRANSITION_POS) < 10) {
                         pivotTo(PIVOT_PICKUP_POS, 100);
-                    }
-                    if (fabs(pivotPositionDegrees() - PIVOT_OUT_POS) < 20) {
+                    } 
+                    
+                    if (fabs(pivotPositionDegrees() - PIVOT_PICKUP_POS) < 20) {
                         loadPickupTransition = false; // pivot is out, now it's safe to lower
                     }
                 } else {
                     liftTo(CASCADE_PICKUP_POS);
-                    pivotTo(PIVOT_PICKUP_POS, 100);
+                    if (fabs(liftMotor.get_position() - CASCADE_PICKUP_POS) < 10) {
+                        pivotTo(PIVOT_PICKUP_POS, 100);
+                    } 
                 }
                 break;
             case ArmState::SCORING: {

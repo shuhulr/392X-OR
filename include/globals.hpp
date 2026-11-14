@@ -100,15 +100,15 @@ extern const uint32_t PTO_SWITCH_MS;
 // Starting pose: claw is physically in LOAD, but the cascade string is unwound.
 // After the match starts, wind the cascade to the previous STOW motor target.
 // !TODO
-inline constexpr double CASCADE_LOAD_POS = 700;
-inline constexpr double CASCADE_STOW_POS = 700;       // placeholder: fully down, below load
-inline constexpr double CASCADE_PICKUP_POS = 170 ;
-inline constexpr double CASCADE_TRANSITION_POS = 2300;   
+inline constexpr double CASCADE_LOAD_POS = 200;
+inline constexpr double CASCADE_STOW_POS = 200;       // placeholder: fully down, below load
+inline constexpr double CASCADE_PICKUP_POS = 0 ;
+inline constexpr double CASCADE_TRANSITION_POS = 400;   
 
 extern const double SCORE_GRID[];
 
 // Retained scoring targets from the old SCORE_GRID: SCORE_GRID[1] was 400.
 // The higher target preserves the old +30 motor-degree offset. Calibrate on robot.
 constexpr double SCORE_LOW_POS = 0;
-constexpr double SCORE_HIGH_POS = 1100;
+constexpr double SCORE_HIGH_POS = 600;
 

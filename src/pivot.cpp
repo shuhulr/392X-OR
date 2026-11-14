@@ -57,15 +57,17 @@ void transitionLiftSlowly() {
 } // namespace
 
 void pivotInitialize() {
-    pivotRotation.set_position(500);
+    
     pivotMotor.set_encoder_units(pros::motor_encoder_units_e::E_MOTOR_ENCODER_DEGREES);
-    pivotMotor.set_zero_position(5); // LOAD pose is the 5-degree reference (centidegrees)
+    pivotRotation.set_position(4500);
+    pivotMotor.set_zero_position(45); // LOAD pose is the 5-degree reference (centidegrees)
     transitionActive = false;
 }
 
 double pivotPositionDegrees() {
     // PROS Rotation::get_position() returns centidegrees.
     return pivotRotation.get_position() / 100.0;
+    
     // return pivotMotor.get_position() / (-3);
 }
 
@@ -101,7 +103,7 @@ void applyPivotTarget() {
     }
 
     pivotMotor.move_voltage(static_cast<std::int32_t>(voltage));
-    printf("Target: %.2f | Position: %.2f | Error: %.2f, Voltage: %lf\n",pivotTarget,pivotPositionDegrees(),pivotTarget - pivotPositionDegrees(),voltage);
+    // printf("Target: %.2f | Position: %.2f | Error: %.2f, Voltage: %lf\n",pivotTarget,pivotPositionDegrees(),pivotTarget - pivotPositionDegrees(),voltage);
 }
 
 bool pivotBeginScoringTransition() {
@@ -114,7 +116,7 @@ bool pivotBeginScoringTransition() {
 }
 
 PivotTransitionStatus pivotUpdateScoringTransition() {
-    if (!transitionActive) return PivotTransitionStatus::IDLE;
+    if (!transitionActive) return PivotTransitionStatus::IDLE; 
 
     const uint32_t now = pros::millis();
     const uint32_t dt = now - lastUpdateMs;
