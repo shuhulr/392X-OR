@@ -25,18 +25,15 @@ extern lemlib::ControllerSettings angularController;
 extern lemlib::ControllerSettings angularControllerU40;
 extern pros::Controller controller;
 
-// intake (port 7, reversed)
-extern pros::Motor intakeMotor;
 
-// lift - cascade (port 12)
-extern pros::Motor liftMotor;
+extern pros::Motor leftLiftMotor;
+extern pros::Motor rightLiftMotor;
+extern pros::MotorGroup lift;
 
-extern pros::Motor pivotMotor;  // claw pitch (15)
-extern pros::Motor flipMotor;   // claw rotation (-16)
 
 extern pros::MotorGroup leftMotors;
 extern pros::MotorGroup rightMotors;
-extern pros::adi::Pneumatics claw;
+extern pros::Motor clawMotor;
 extern pros::adi::Pneumatics toggler;
 extern pros::Distance leftDist;
 extern pros::Distance rightDist;
@@ -100,10 +97,9 @@ extern const uint32_t PTO_SWITCH_MS;
 // Starting pose: claw is physically in LOAD, but the cascade string is unwound.
 // After the match starts, wind the cascade to the previous STOW motor target.
 // !TODO
-inline constexpr double CASCADE_LOAD_POS = 200;
-inline constexpr double CASCADE_STOW_POS = 200;       // placeholder: fully down, below load
-inline constexpr double CASCADE_PICKUP_POS = 0 ;
-inline constexpr double CASCADE_TRANSITION_POS = 400;   
+inline constexpr double CASCADE_MAX_POS = 2000;
+inline constexpr double CASCADE_MIN_POS = 0;
+inline constexpr double CASCADE_PICKUP_POS = 0; 
 
 extern const double SCORE_GRID[];
 

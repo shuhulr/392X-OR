@@ -13,8 +13,6 @@
 #include "pros/rtos.hpp"
 #include "autons.h"    // IWYU pragma: keep
 #include "globals.hpp"
-#include "pto.hpp"
-#include "pivot.hpp"
 #include "pros/screen.h" // IWYU pragma: keep
 #include <algorithm> // IWYU pragma: keep
 #include <cstdio>
@@ -47,25 +45,27 @@ pros::Controller controller(pros::E_CONTROLLER_MASTER);
 // #186 documents 5.5W motors not always being ratioed the same as 11W ones
 // in a group. Keep an eye on drift/uneven power between the front and rear
 // motors; if you see it, that's likely why.
-pros::MotorGroup leftMotors({-16, -17, -18}, pros::MotorGearset::blue);  // left motor group
-pros::MotorGroup rightMotors({12, 13, 14}, pros::MotorGearset::blue);   // right motor group
+pros::MotorGroup leftMotors({-1, -6, -18}, pros::MotorGearset::blue);  // left motor group
+pros::MotorGroup rightMotors({2, 15, 19}, pros::MotorGearset::blue);   // right motor group
 
 // lift - cascade (port 12, reversed) permanent motor
 // ptoMotor switches between intake and cascade
-pros::Motor liftMotor(21, pros::MotorGearset::green);
+pros::Motor leftLiftMotor(-20, pros::MotorGearset::green);
+pros::Motor rightLiftMotor(11, pros::MotorGearset::green);
+
+pros::MotorGroup lift({-20, 11}, pros::MotorGearset::green);
+
 
 // pivot (claw pitch, port 6) and flip (claw rotation, port 16 reversed)
-pros::Motor pivotMotor(1);
-pros::Motor flipMotor(4, pros::MotorGearset::green);
+pros::Motor clawMotor(-13);
 
 // Dedicated pivot feedback sensor on port 9. Negative port reverses its
 // reported direction, so pivot-up should produce increasing position.
 
-enum class ArmState {STOW, LOAD, PICKUP, SCORING, SCORED};
-ArmState armState = ArmState::LOAD;
+enum class ArmState {PICKUP, RAISING, FALLING};
+ArmState armState = ArmState::PICKUP;
 
 // pneumatics
-pros::adi::Pneumatics claw('A', true, false);
 pros::adi::Pneumatics toggler('H', false, true);
 
 // TODO: tune all of these once the mechanism is built out
@@ -85,54 +85,21 @@ bool loadTransitionReached = false;
 // move the cascade to a position; hold still while the PTO is mid-switch
 // (maxRpm / moveToPercent live in globals.hpp)
 void liftTo(double position) {
-    if (ptoReady()) moveToPercent(liftMotor, position, 100);
-    else liftMotor.brake();
+    moveToPercent(lift, position, 100);
 }
-
-void windCascadeAtMatchStart(bool holdAfterWinding = false) {
-    if (startupWindDone) return;
-
-    // Keep the pivot/claw in its physical LOAD pose while winding the string.
-    ptoRequest(PtoMode::COMBINED);
-    const uint32_t start = pros::millis();
-    while (!ptoReady() || ptoMode() != PtoMode::COMBINED) {
-        ptoRequest(PtoMode::COMBINED);
-        ptoUpdate();
-        liftMotor.brake();
-        if (pros::millis() - start > 1500) {
-            liftMotor.brake();
-            return; // fail safe if the PTO does not engage
-        }
-        pros::delay(10);
-    }
-
-    liftMotor.move_absolute(CASCADE_STOW_POS, maxRpm(liftMotor));
-    const uint32_t windStart = pros::millis();
-    while (std::fabs(liftMotor.get_position() - CASCADE_STOW_POS) > 20 &&
-           pros::millis() - windStart < 3000) {
-        ptoRequest(PtoMode::COMBINED);
-        ptoUpdate();
-        pros::delay(10);
-    }
-    liftMotor.brake();
-    startupWindDone = true;
-    startupWindHold = holdAfterWinding;
-}
-
-
 
 
 // game color (0 for red, 1 for blue, -1 for none)
 int gameColor = -1;
 
 // Inertial Sensor (port 7)
-pros::Imu imu(7);
+pros::Imu imu(12);
 
 // tracking wheels
 // vertical odometry rotation sensor, port 7, reversed
-pros::Rotation verticalEnc(-15);
+pros::Rotation verticalEnc(-17);
 // horizontal odometry rotation sensor, port 10, reversed
-pros::Rotation horizontalEnc(10);
+pros::Rotation horizontalEnc(16);
 // horizontal tracking wheel. 2" diameter, 4" offset behind center (negative)
 lemlib::TrackingWheel horizontal(&horizontalEnc, 2, -3.8);
 // vertical tracking wheel. 2" diameter, 0.15" offset right of center (positive)
@@ -172,9 +139,9 @@ lemlib::ControllerSettings angularController(angular_kp,
 );
 
 // secondary angular controller, used for tighter U40-class turns
-lemlib::ControllerSettings angularControllerU40(4.7,
-                                             0.28,
-                                             20.5,
+lemlib::ControllerSettings angularControllerU40(4.3,
+                                             0.27,
+                                             21.5,
                                              4,
                                              1,
                                              75,
@@ -249,10 +216,10 @@ void rightScreenButton() {
 void displayImage();
 
 void initialize() {
-    
-    pivotMotor.set_encoder_units(pros::v5::MotorEncoderUnits::degrees);
-    flipMotor.set_encoder_units(pros::v5::MotorEncoderUnits::degrees);
-    liftMotor.set_encoder_units(pros::v5::MotorEncoderUnits::degrees);
+    lift.set_encoder_units(pros::v5::MotorEncoderUnits::degrees);
+    lift.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+    leftLiftMotor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+    rightLiftMotor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
     
 #if RCL_ENABLED
     RclMain.startTracking();
@@ -284,17 +251,8 @@ void initialize() {
     RclMain.updateBotPose(&leftRcl);
 #endif
 
-    // hold position when no voltage is applied, instead of coasting/falling
-    liftMotor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-
-    // zero the arm motors so every position constant is relative to the load
-    // pose - the bot must be physically in the load pose when powered on
-    liftMotor.tare_position();
-    pivotMotor.tare_position(-5); // retained for diagnostics; pivot feedback lives in pivot.cpp
-    flipMotor.tare_position();
-    pivotInitialize(); // robot must be physically in LOAD pose here
-    pivotMotor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
-    flipMotor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
+    lift.tare_position();
+    clawMotor.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
 
 
     // thread for brain screen display and position logging
@@ -311,9 +269,8 @@ void initialize() {
             pros::lcd::print(3, "auton index: %d", auton);
             pros::lcd::print(4, "%s", std::get<0>(autons[auton]).c_str());
             pros::lcd::print(5, "Left: %.1f  Right: %.1f", leftMotors.get_temperature(), rightMotors.get_temperature());
-            pros::lcd::print(6, "Pivot: %.1f  Lift: %.1f", pivotPositionDegrees(), liftMotor.get_position());
+            pros::lcd::print(6, "Lift: %.1f", lift.get_temperature());
             //pros::lcd::print(7, "PTO mode: %s", ptoMode() == PtoMode::COMBINED ? "22W" : "split");
-            //pros::lcd::print(7, "liftMotor position: %.2lf", liftMotor.get_position());
 
             // log position telemetry
             lemlib::telemetrySink()->info("Chassis pose: {}", chassis.getPose());
@@ -336,8 +293,6 @@ void competition_initialize() {
 }
 
 void autonomous() {
-    windCascadeAtMatchStart(false);
-    ptoMotor.tare_position();
     std::get<1>(autons[auton])();
 }
 
@@ -352,30 +307,19 @@ constexpr double SCORE_MAX_POS = 1600;
 void opcontrol() {
     chassis.setPose(0, 0, 0);
     chassis.setBrakeMode(pros::E_MOTOR_BRAKE_COAST);
+    lift.set_brake_mode(pros::E_MOTOR_BRAKE_HOLD);
     printf("\nDriver Control Started\n");
     opControl = true;
-    windCascadeAtMatchStart(true);
+    bool movingToPickup = false;
 
     while (true) {
         // Isolated cascade test: stop drivetrain, engage the PTO, then run both
         // cascade motors at full voltage. Wait safely while the PTO is switching.
         if (CASCADE_TEST_MODE) {
             chassis.arcade(0, 0);
-            ptoRequest(PtoMode::COMBINED);
-            ptoUpdate();
-
-            if (ptoReady() && ptoMode() == PtoMode::COMBINED) {
-                liftMotor.move_voltage(12000);
-                // In COMBINED mode, ptoUpdate makes ptoMotor follow the lift
-                // motor's applied voltage using the configured PTO_FOLLOW_SIGN.
-                ptoUpdate();
-            } else {
-                liftMotor.move(0);
-                ptoMotor.move(0);
-            }
-
+            lift.move_voltage(12000);
             pros::delay(10);
-            continue; // bypass all normal driver-control commands in test mode
+            continue;
         }
 
         int leftX = controller.get_analog(pros::E_CONTROLLER_ANALOG_LEFT_X);
@@ -390,7 +334,7 @@ void opcontrol() {
 
           
 
-        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) claw.toggle();
+        if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) toggler.toggle();
 
         bool aPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A);
         bool bPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B);
@@ -399,191 +343,25 @@ void opcontrol() {
         bool r1Held = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
         bool l1Held = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1);
         bool l2Held = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
-        static ArmState lastArmState = ArmState::LOAD;
-        static double scoreTarget = CASCADE_LOAD_POS;
-        static bool scoringTransitionActive = false;
-
-        // intake
-        if (r1Held) {
-            intake(127);
-        } else if (l1Held) {
-            intake(-127);
-        } else {
-            stopIntake();
-        }
 
 
-        // Any arm command exits the initial post-winding hold and restores normal controls.
-        if (aPressed || bPressed || r2Held) startupWindHold = false;
+        if (aPressed) movingToPickup = !movingToPickup;
 
-        // R2: hold to score from any state; releasing it moves SCORING -> SCORED
-        if (r2Held) armState = ArmState::SCORING;
-        else if (armState == ArmState::SCORING) armState = ArmState::SCORED;
-
-        // A: cancel whatever's happening and go to load.
-        // B: go to pickup; press again to go back to load.
-        if (aPressed) {
-            armState = ArmState::LOAD;
-            loadTransitionReached = false;
-        } else if (bPressed) armState = (armState == ArmState::PICKUP) ? ArmState::LOAD : ArmState::PICKUP;
-        
-
-        if (lastArmState == ArmState::LOAD && armState == ArmState::PICKUP) {
-            loadPickupTransition = true;
-        } else if (armState != ArmState::PICKUP) {
-            loadPickupTransition = false; // cancelled: don't leave it armed
-        }
-
-        // On R2 press, start the coordinated scoring transition.
-        // On release, advance the stored scoring target by one stack spacing.
-        if (armState == ArmState::SCORING &&
-            lastArmState == ArmState::LOAD) {
-            scoringTransitionActive = pivotBeginScoringTransition();
-        }
-
-        if (armState == ArmState::SCORED &&
-            lastArmState == ArmState::SCORING) {
-
-            scoreTarget = std::clamp(
-                scoreTarget + SCORE_SPACING,
-                SCORE_MIN_POS,
-                SCORE_MAX_POS
-            );
-
-            scoringTransitionActive = false;
-            pivotCancelScoringTransition();
-
-        } else if (armState != ArmState::SCORING) {
-            scoringTransitionActive = false;
-            pivotCancelScoringTransition();
-        }
-
-        // Reset the stored scoring level when returning to LOAD.
-        if (aPressed) {
-            scoreTarget = CASCADE_LOAD_POS;
-        }
-
-        lastArmState = armState;
-
-        if (yPressed) {
-            toggler.toggle();
-        }
-
-
-        // PTO: force COMBINED while R2 is held so the cascade has both motors
-        // available from the start of scoring. Otherwise preserve the normal
-        // height-based / intake-based PTO behavior.
-        if (r2Held ||
-            (liftMotor.get_position() > PTO_SPLIT_MAX_POS) ||
-            (ptoMode() == PtoMode::COMBINED && (!r1Held && !l1Held))) {
-            ptoRequest(PtoMode::COMBINED);
-        } else {
-            ptoRequest(PtoMode::SPLIT);
-        }
-        ptoUpdate();
-
-
-        if (startupWindHold) {
-            liftTo(CASCADE_STOW_POS);
-            pivotTo(PIVOT_DOWN_POS, 50);
-        } else switch (armState) {
-            case ArmState::STOW:
-                pivotTo(PIVOT_OUT_POS, 100);
-                if (fabs(pivotPositionDegrees() - PIVOT_OUT_POS) < 20) {
-                    liftTo(CASCADE_STOW_POS);
-                } else {
-                    liftMotor.brake(); // hold the cascade until the pivot has cleared
-                }
-                break;
-            case ArmState::LOAD:
-                if (!loadTransitionReached) {
-                    liftTo(CASCADE_TRANSITION_POS);
-                } else {
-                    pivotTo(PIVOT_DOWN_POS, 100);
-                    liftTo(CASCADE_LOAD_POS);
-                }
-                if (fabs(liftMotor.get_position() - CASCADE_TRANSITION_POS) < 10) {
-                    loadTransitionReached = true;
-                }
-                break;
-            case ArmState::PICKUP:
-                if (loadPickupTransition) {
-                    liftTo(CASCADE_TRANSITION_POS);
-                    if (fabs(liftMotor.get_position() - CASCADE_TRANSITION_POS) < 10) {
-                        pivotTo(PIVOT_PICKUP_POS, 100);
-                    } 
-                    
-                    if (fabs(pivotPositionDegrees() - PIVOT_PICKUP_POS) < 20) {
-                        loadPickupTransition = false; // pivot is out, now it's safe to lower
-                    }
-                } else {
-                    liftTo(CASCADE_PICKUP_POS);
-                    if (fabs(liftMotor.get_position() - CASCADE_PICKUP_POS) < 10) {
-                        pivotTo(PIVOT_PICKUP_POS, 100);
-                    } 
-                }
-                break;
-            case ArmState::SCORING: {
-                if (scoringTransitionActive) {
-                    PivotTransitionStatus status = pivotUpdateScoringTransition();
-                    if (status == PivotTransitionStatus::RUNNING) {
-                        break; // pivot.cpp is commanding both lift and pivot this loop
-                    }
-                    // COMPLETE or TIMED_OUT: hand off immediately to regular scoring.
-                    scoringTransitionActive = false;
-                }
-
-                // Regular scoring behavior. This is also the fallback if the
-                // coordinated transition reaches its timeout before the pivot clears.
-                if (ptoReady()) {
-                    liftMotor.move(127);
-                } else {
-                    liftMotor.brake();
-                }
-                pivotTo(PIVOT_OUT_POS, 100);
-                break;
+        if (movingToPickup) {
+            lift.move_absolute(CASCADE_PICKUP_POS, 100);
+            if (fabs(lift.get_position() - CASCADE_PICKUP_POS) < 10) {
+                movingToPickup = false;
             }
-            case ArmState::SCORED:
-                pivotTo(PIVOT_OUT_POS, 100);
-                if (l2Held) {
-                    liftTo(CASCADE_PICKUP_POS);
-                } else {
-                    liftMotor.brake();
-                }
-                break;
+        } else{
+            if (r2Held) lift.move(127);
+            else if (l2Held) lift.move(-64);
+            else lift.brake();
         }
 
-        bool downPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_DOWN);
-
-        if (downPressed && armState != ArmState::LOAD) {
-            clawDown = !clawDown;
-            flipTarget = clawDown ? CLAW_DOWN_POS : CLAW_UP_POS;
-
-            printf("Flip target: %.2f\n", flipTarget);
-        }
-
-        double flipError = flipTarget + flipMotor.get_position();
-
-        if (fabs(flipError) <= FLIP_TOLERANCE) {
-            flipMotor.move_voltage(0);
-        } 
-        else {
-            double flipVoltage = -flipError * FLIP_KP;
-
-            flipVoltage = std::clamp(
-                flipVoltage,
-                -FLIP_MAX_VOLTAGE,
-                FLIP_MAX_VOLTAGE
-            );
-
-            flipMotor.move_voltage(static_cast<int32_t>(flipVoltage));
-        }
-
-        printf("Position: %.2f | Target: %.2f | Error: %.2f\n",
-            flipMotor.get_position(),
-            flipTarget,
-            flipError);
-
+        // ! CHANGE CLAW TO A TOGGLE BUTTON IF CONSTANT PRESSURE NEEDS TO BE APPLIED
+        if (r1Held) clawMotor.move(127);
+        else if (l1Held) clawMotor.move(-127);
+        else clawMotor.brake();
         
         pros::delay(10);
     }

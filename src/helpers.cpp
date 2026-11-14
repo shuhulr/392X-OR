@@ -5,11 +5,10 @@
 #include "pros/rtos.hpp"
 #include <cstdio>
 
-bool intaking = false;
 bool armMoving = false;
 
-double angular_kp = 1.9;
-double angular_ki = 0.15;
+double angular_kp = 2.05;
+double angular_ki = 0.2;
 double angular_kd = 11.6;
 
 
@@ -27,10 +26,6 @@ void stopDrive() {
 
 // outtake/score at a given speed (negative to reverse). Adjust if scoring
 // should behave differently than just running the intake backwards.
-void score(int speed) {
-    intakeMotor.move(speed);
-    intaking = true;
-}
 
 
 
