@@ -95,156 +95,145 @@ void rightSubmissive() {
 }
 
 void leftDominant() {
-    // // The robot should start physically in LOAD, matching pivotInitialize().
-    // pros::Task updateTask(task);
-    // chassis.setPose(0, -62.75, 180);
-    // pivotInitialize();
+    // The robot should start physically in LOAD, matching pivotInitialize().
+    chassis.setPose(0, -63.5, 180);
 
     
-    // claw.extend();
+    intake();
     
-    // toggler.extend();
-    // moveWithVoltage(-35,-35);
-    // pros::delay(420);
+    toggler.retract();
+    liftTo(SCORE_LOW_POS + 600);
+    moveWithVoltage(-35,-35);
+    pros::delay(420);
 
-    // // toggle 1
-    // moveWithVoltage(50, 50);
-    // pros::delay(400);
-    // pros::Task transfer(transferTask);
-    // moveWithVoltage(-35,-35);
-    // pros::delay(450);
+    // toggle 1
+    moveWithVoltage(50, 50);
+    pros::delay(400);
+    moveWithVoltage(-35,-35);
+    pros::delay(450);
 
-    // // toggle 2
-    // moveWithVoltage(50,50);
-    // pros::delay(400);
+    // toggle 2
+    moveWithVoltage(50,50);
+    pros::delay(400);
     
-    // chassis.moveDistance(-6, 250, {.forwards=false}, false); 
-    // chassis.moveToPoint(0, -48, 650, {.forwards=false}, false);
+    chassis.moveDistance(-6, 250, {.forwards=false}, false); 
+    chassis.moveToPoint(0, -48, 650, {.forwards=false}, false);
 
-    // // chassis.waitUntilDone();
+    // chassis.waitUntilDone();
 
-    // printf("Approach pose: x=%f, y=%f, theta=%f\n",
-    //        chassis.getPose().x, chassis.getPose().y, chassis.getPose().theta);
-    // claw.extend();
-    // // Face the scoring location, then command the pivot straight to scoring.
+    printf("Approach pose: x=%f, y=%f, theta=%f\n",
+           chassis.getPose().x, chassis.getPose().y, chassis.getPose().theta);
+    // Face the scoring location, then command the pivot straight to scoring.
 
     
-    // chassis.turnToPoint(24, -48, 600, {.forwards=false}, false);
-    // // chassis.waitUntilDone();
-    // printf("%lf",pivotPositionDegrees());
-    
-    // transferTaskOn = false;
-    // liftTo(SCORE_LOW_POS+200);
+    chassis.turnToPoint(24, -48, 600, {.forwards=false}, false);
+    // chassis.waitUntilDone();
 
 
-    // // Approach the scoring point while the cascade continues toward height.
-    // chassis.moveDistance(-20, 600, {.forwards=false});
-    // chassis.waitUntil(17);
-    // chassis.cancelMotion();
+    // Approach the scoring point while the cascade continues toward height.
+    chassis.moveDistance(-20, 600, {.forwards=false});
+    chassis.waitUntil(17);
+    chassis.cancelMotion();
 
 
-    // // Final small contact/settling movement.
-    // moveWithVoltage(-20, -20);
-    // pros::delay(350);
-    // stopDrive();
+    // Final small contact/settling movement.
+    moveWithVoltage(-20, -20);
+    pros::delay(350);
+    stopDrive();
     // chassis.moveDistance(2, 300, {}, true);
 
-    // pivotTo(PIVOT_OUT_POS, 50);
-    // liftTo(SCORE_LOW_POS);
-    // pros::delay(450);
-    // claw.retract();
-    // printf("%lf",pivotPositionDegrees());
+
+    liftTo(SCORE_LOW_POS);
+    pros::delay(450);
+    stoptake();
     
-    // pros::delay(200);
+    pros::delay(200);
 
 
-    // chassis.moveDistance(7, 700, {}, false);
-    // liftTo(CASCADE_PICKUP_POS);
-    // chassis.turnToPoint(24, -24, 600, {.forwards=false}, false);
-
-    // pivotTo(PIVOT_OUT_POS, 100);
+    chassis.moveDistance(7, 700, {}, false);
+    liftTo(CASCADE_PICKUP_POS);
+    chassis.turnToPoint(24, -24, 600, {.forwards=false}, false);
+    intake();
     
-    // chassis.moveDistance(-24, 800, {.forwards=false}, true);
-    // chassis.waitUntil(17);
-    // chassis.cancelMotion();
-    // moveWithVoltage(-20, -20);
+    chassis.moveDistance(-24, 800, {.forwards=false}, true);
+    chassis.waitUntil(17);
+    chassis.cancelMotion();
+    moveWithVoltage(-20, -20);
 
-    // pros::delay(200);
-    // claw.extend();
-    // pros::delay(100);
-
-    // liftTo(SCORE_LOW_POS+650);
-    // pivotTo(PIVOT_OUT_POS, 100);
-    // chassis.moveToPoint(24, -24, 500, {.forwards=false}, false);
-    // chassis.turnToPoint(24, -48, 600, {.forwards=false}, false);
+    pros::delay(200);
+    liftTo(SCORE_LOW_POS+850);
+    chassis.moveToPoint(24, -24, 500, {.forwards=false}, false);
+    chassis.turnToPoint(24, -48, 600, {.forwards=false}, false);
 
 
-    // //!TODO CHANGE TO POINT LATER
-    // chassis.moveDistance(-20, 800, {.forwards=false});
-    // chassis.waitUntil(17);
-    // chassis.cancelMotion();
+    //!TODO CHANGE TO POINT LATER
+    chassis.moveDistance(-20, 800, {.forwards=false});
+    chassis.waitUntil(17);
+    chassis.cancelMotion();
 
-    // // Final small contact/settling movement.
-    // moveWithVoltage(-20, -20);
-    // pros::delay(400);
-    // stopDrive();
+    // Final small contact/settling movement.
+    moveWithVoltage(-20, -20);
+    pros::delay(400);
+    stopDrive();
 
-    // pivotTo(PIVOT_OUT_POS, 50);
-    // liftTo(SCORE_LOW_POS+300);
-    // pros::delay(400);
-    // claw.retract();
-    // printf("%lf",pivotPositionDegrees());
+
+    liftTo(SCORE_LOW_POS+300);
+    pros::delay(400);
+    stoptake();
     
-    // pros::delay(200);
+    pros::delay(200);
 
 
-    // // last 
+    // last 
 
 
-    // chassis.moveDistance(7, 700, {}, false);
-    // liftTo(CASCADE_PICKUP_POS);
-    // chassis.turnToPoint(48, -48, 600, {.forwards=false}, false);
+    chassis.moveDistance(7, 700, {}, false);
+    liftTo(CASCADE_PICKUP_POS);
+    chassis.turnToPoint(48, -48, 600, {.forwards=false}, false);
 
-    // pivotTo(PIVOT_OUT_POS, 100);
-    
-    // chassis.moveDistance(-24, 800, {.forwards=false}, true);
-    // chassis.waitUntil(13);
-    // chassis.cancelMotion();
-    // moveWithVoltage(-20, -20);
+    intake();
+    chassis.moveDistance(-24, 800, {.forwards=false}, true);
+    chassis.waitUntil(13);
+    chassis.cancelMotion();
+    moveWithVoltage(-20, -20);
 
-    // pros::delay(200);
-    // claw.extend();
-    // pros::delay(100);
+    pros::delay(200);
 
-    // liftTo(SCORE_LOW_POS+800);
-    // pivotTo(PIVOT_OUT_POS, 100);
-    // chassis.moveToPoint(48, -48, 500, {.forwards=false}, false);
-    // chassis.turnToPoint(24, -48, 600, {.forwards=false}, false);
+    liftTo(SCORE_LOW_POS+1000);
+    chassis.moveToPoint(48, -48, 500, {.forwards=false}, false);
+    chassis.turnToPoint(24, -48, 600, {.forwards=false}, false);
 
 
-    // //!TODO CHANGE TO POINT LATER
-    // chassis.moveDistance(-20, 800, {.forwards=false});
-    // chassis.waitUntil(14);
-    // chassis.cancelMotion();
+    //!TODO CHANGE TO POINT LATER
+    chassis.moveDistance(-20, 800, {.forwards=false});
+    chassis.waitUntil(14);
+    chassis.cancelMotion();
 
  
-    // // Final small contact/settling movement.
-    // moveWithVoltage(-20, -20);
-    // pros::delay(600);
-    // stopDrive();
+    // Final small contact/settling movement.
+    moveWithVoltage(-20, -20);
+    pros::delay(600);
+    stopDrive();
 
-    // pivotTo(PIVOT_OUT_POS, 50);
-    // liftTo(SCORE_LOW_POS+500);
-    // pros::delay(400);
-    // claw.retract();
-    // printf("%lf",pivotPositionDegrees());
+    liftTo(SCORE_LOW_POS+500);
+    pros::delay(400);
+    stoptake();
     
-    // pros::delay(200);
+    
+    pros::delay(200);
 
 }
 
 void rightDominant() {
-
+    liftTo(SCORE_LOW_POS + 5);
+    pros::delay(1000);
+    liftTo(SCORE_LOW_POS + 10);
+    pros::delay(1000);
+    liftTo(SCORE_LOW_POS + 15);
+    pros::delay(1000);
+    liftTo(SCORE_LOW_POS + 20);
+    pros::delay(1000);
+    liftTo(SCORE_LOW_POS);
 }
 // Starting poses for this season's autons go here once field setup is
 // finalized, e.g.:

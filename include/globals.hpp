@@ -49,9 +49,9 @@ extern RclTracking RclMain;
 
 
 // helpers.cpp
-extern void intake(int voltage);
+extern void intake();
 extern void moveWithVoltage(int left, int right);
-extern void stopIntake();
+extern void stoptake();
 extern void stopDrive();
 extern void score(int speed);
 extern void stopArm();
@@ -99,12 +99,12 @@ extern const uint32_t PTO_SWITCH_MS;
 // !TODO
 inline constexpr double CASCADE_MAX_POS = 2000;
 inline constexpr double CASCADE_MIN_POS = 0;
-inline constexpr double CASCADE_PICKUP_POS = 0; 
+inline constexpr double CASCADE_PICKUP_POS = 0.314; 
 
 extern const double SCORE_GRID[];
 
 // Retained scoring targets from the old SCORE_GRID: SCORE_GRID[1] was 400.
 // The higher target preserves the old +30 motor-degree offset. Calibrate on robot.
-constexpr double SCORE_LOW_POS = 0;
+constexpr double SCORE_LOW_POS = 0.314;
 constexpr double SCORE_HIGH_POS = 600;
 

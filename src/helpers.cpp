@@ -23,7 +23,18 @@ void stopDrive() {
     rightMotors.move_voltage(0);
 }
 
+void intake() {
+    clawMotor.move(127);
+}
 
+void stoptake() {
+    clawMotor.move(-128);
+
+    pros::Task([] {
+        pros::delay(500);
+        clawMotor.move_voltage(0);
+    });
+}
 // outtake/score at a given speed (negative to reverse). Adjust if scoring
 // should behave differently than just running the intake backwards.
 

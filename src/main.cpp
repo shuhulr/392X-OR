@@ -36,6 +36,9 @@ bool startupWindHold = false;
 // screen task flag
 bool screenTaskRunning = true;
 
+
+bool clawOn = false;
+
 // controller
 pros::Controller controller(pros::E_CONTROLLER_MASTER);
 
@@ -66,7 +69,7 @@ enum class ArmState {PICKUP, RAISING, FALLING};
 ArmState armState = ArmState::PICKUP;
 
 // pneumatics
-pros::adi::Pneumatics toggler('H', false, true);
+pros::adi::Pneumatics toggler('A', true, false);
 
 // TODO: tune all of these once the mechanism is built out
 
@@ -84,9 +87,75 @@ bool loadTransitionReached = false;
 
 // move the cascade to a position; hold still while the PTO is mid-switch
 // (maxRpm / moveToPercent live in globals.hpp)
-void liftTo(double position) {
-    moveToPercent(lift, position, 100);
+#include "main.h"
+#include <cmath>
+#include <algorithm>
+#include <atomic>
+
+// Global lift motor (Port 1) and V5 Distance Sensor (Port 2)
+pros::Motor lift_motor(1, pros::v5::MotorGears::green);
+pros::Distance lift_distance(5);
+
+// Helper function to read distance in inches
+pros::Task* liftTask = nullptr;
+bool liftRunning = false; // Tracks if the task is actually alive
+
+double getLiftPosition() {
+    int mm = lift_distance.get();
+    if (mm == PROS_ERR || mm >= 9999) {
+        return -1.0;
+    }
+    return mm / 25.4;
 }
+
+void liftUpdate(double target) {
+    double liftKP = 50.0;
+    double tolerance = 0.5;
+    double maxSpeed = static_cast<double>(maxRpm(lift));
+
+    while (true) {
+        double currentDistance = getLiftPosition();
+
+        if (currentDistance < 0.0) {
+            lift.brake();
+            pros::delay(20);
+            continue;
+        }
+
+        double error = target - currentDistance;
+
+        if (std::abs(error) <= tolerance) {
+            lift.brake();
+            liftRunning = false; // Mark task as finished before exiting!
+            return;
+        } else {
+            double velocity = std::clamp(error * liftKP, -maxSpeed, maxSpeed);
+            lift.move_velocity(static_cast<int32_t>(velocity));
+        }
+
+        pros::delay(20);
+    }
+}
+
+void liftTo(double position) {
+    // Only kill the task if it is STILL running
+    if (liftRunning && liftTask != nullptr) {
+        liftTask->remove();
+        liftRunning = false;
+    }
+
+    // Clean up the C++ wrapper safely
+    if (liftTask != nullptr) {
+        delete liftTask;
+        liftTask = nullptr;
+    }
+
+    liftRunning = true;
+    liftTask = new pros::Task([position] {
+        liftUpdate(position);
+    });
+}
+
 
 
 // game color (0 for red, 1 for blue, -1 for none)
@@ -95,29 +164,30 @@ int gameColor = -1;
 // Inertial Sensor (port 7)
 pros::Imu imu(12);
 
+pros::Distance liftDist(18);
 // tracking wheels
 // vertical odometry rotation sensor, port 7, reversed
 pros::Rotation verticalEnc(-17);
 // horizontal odometry rotation sensor, port 10, reversed
 pros::Rotation horizontalEnc(16);
 // horizontal tracking wheel. 2" diameter, 4" offset behind center (negative)
-lemlib::TrackingWheel horizontal(&horizontalEnc, 2, -3.8);
+lemlib::TrackingWheel horizontal(&horizontalEnc, 2, -3.9);
 // vertical tracking wheel. 2" diameter, 0.15" offset right of center (positive)
-lemlib::TrackingWheel vertical(&verticalEnc, 2, -0.3);
+lemlib::TrackingWheel vertical(&verticalEnc, 2, -0.5);
 
 // drivetrain settings
 lemlib::Drivetrain drivetrain(&leftMotors,
                               &rightMotors,
-                              12,                        // track width (in)
+                              10,                        // track width (in)
                               lemlib::Omniwheel::NEW_275,  // 2.75" omnis
                               450,                          // drivetrain rpm
                               8                             // horizontal drift
 );
 
 // lateral motion controller
-lemlib::ControllerSettings linearController(6,  // kP
+lemlib::ControllerSettings linearController(7.1,  // kP
                                             0.24,  // kI
-                                            12,    // kD
+                                            12.1,    // kD
                                             2,     // anti windup
                                             0.5,   // small error range (in)
                                             100,   // small error timeout (ms)
@@ -312,6 +382,15 @@ void opcontrol() {
     opControl = true;
     bool movingToPickup = false;
 
+    enum class ClawState {
+        OFF,
+        FORWARD,
+        REVERSE
+    };
+
+    ClawState clawState = ClawState::OFF;
+    uint32_t clawReverseStart = 0;
+
     while (true) {
         // Isolated cascade test: stop drivetrain, engage the PTO, then run both
         // cascade motors at full voltage. Wait safely while the PTO is switching.
@@ -336,16 +415,14 @@ void opcontrol() {
 
         if (controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_RIGHT)) toggler.toggle();
 
-        bool aPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_A);
         bool bPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_B);
-        bool yPressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_Y);
+        bool r1Pressed = controller.get_digital_new_press(pros::E_CONTROLLER_DIGITAL_R1);
         bool r2Held = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R2);
-        bool r1Held = controller.get_digital(pros::E_CONTROLLER_DIGITAL_R1);
         bool l1Held = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L1);
         bool l2Held = controller.get_digital(pros::E_CONTROLLER_DIGITAL_L2);
 
 
-        if (aPressed) movingToPickup = !movingToPickup;
+        if (bPressed) movingToPickup = !movingToPickup;
 
         if (movingToPickup) {
             lift.move_absolute(CASCADE_PICKUP_POS, 100);
@@ -359,9 +436,39 @@ void opcontrol() {
         }
 
         // ! CHANGE CLAW TO A TOGGLE BUTTON IF CONSTANT PRESSURE NEEDS TO BE APPLIED
-        if (r1Held) clawMotor.move(127);
-        else if (l1Held) clawMotor.move(-127);
-        else clawMotor.brake();
+
+
+        // R1 toggle:
+        // First press  -> forward
+        // Second press -> reverse for 0.5 seconds
+        // Then         -> 0 voltage
+        if (r1Pressed) {
+            if (clawState == ClawState::OFF) {
+                clawState = ClawState::FORWARD;
+                clawMotor.move(127);
+            }
+            else if (clawState == ClawState::FORWARD) {
+                clawState = ClawState::REVERSE;
+                clawReverseStart = pros::millis();
+                clawMotor.move(-127);
+            }
+        }
+
+        if (clawState == ClawState::REVERSE) {
+            if (pros::millis() - clawReverseStart >= 500) {
+                clawMotor.move_voltage(0);
+                clawState = ClawState::OFF;
+            }
+        }
+
+        // L1 still manually runs the claw backward while held.
+        // Don't let it interrupt the automatic 0.5-second reversal.
+        if (l1Held && clawState != ClawState::REVERSE) {
+            clawMotor.move(-127);
+        }
+        else if (clawState == ClawState::OFF && !l1Held) {
+            clawMotor.move_voltage(0);
+        }
         
         pros::delay(10);
     }
