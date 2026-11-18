@@ -92,16 +92,15 @@ bool loadTransitionReached = false;
 #include <algorithm>
 #include <atomic>
 
-// Global lift motor (Port 1) and V5 Distance Sensor (Port 2)
-pros::Motor lift_motor(1, pros::v5::MotorGears::green);
-pros::Distance lift_distance(5);
+// V5 Distance Sensor used for lift height (reads inches)
+pros::Distance liftDistance(5);
 
 // Helper function to read distance in inches
 pros::Task* liftTask = nullptr;
 bool liftRunning = false; // Tracks if the task is actually alive
 
 double getLiftPosition() {
-    int mm = lift_distance.get();
+    int mm = liftDistance.get();
     if (mm == PROS_ERR || mm >= 9999) {
         return -1.0;
     }
@@ -109,12 +108,12 @@ double getLiftPosition() {
 }
 
 void liftUpdate(double target) {
-    double liftKP = 50.0;
+    double liftKP = 0.8;
     double tolerance = 0.5;
     double maxSpeed = static_cast<double>(maxRpm(lift));
 
     while (true) {
-        double currentDistance = getLiftPosition();
+        double currentDistance = lift.get_position();  // getLiftPosition();
 
         if (currentDistance < 0.0) {
             lift.brake();
@@ -297,10 +296,11 @@ void initialize() {
 
     FILE* file = fopen("/usd/auto.txt", "r");
     if (file != NULL) {
-        char buf[3]; // two digits + null terminator
-        fread(buf, 1, 2, file);
-        buf[2] = '\0'; // tells stoi where the string ends
-        auton = std::stoi(buf);
+        char buf[3] = {0}; // two digits + null terminator
+        size_t n = fread(buf, 1, 2, file);
+        buf[n] = '\0'; // only use the bytes actually read
+        auton = (n > 0) ? atoi(buf) : 1;
+        if (auton < 0 || auton >= (int)autons.size()) auton = 1;
         printf("Loaded Auton: %s\n", buf);
         fclose(file);
     } else {

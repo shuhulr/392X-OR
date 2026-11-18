@@ -82,6 +82,7 @@ inline void moveToPercent(pros::AbstractMotor& m, double position, int percent) 
 }
 
 void liftTo(double position);
+double getLiftPosition();
 
 extern bool intaking;
 extern bool armMoving;
@@ -99,12 +100,17 @@ extern const uint32_t PTO_SWITCH_MS;
 // !TODO
 inline constexpr double CASCADE_MAX_POS = 2000;
 inline constexpr double CASCADE_MIN_POS = 0;
-inline constexpr double CASCADE_PICKUP_POS = 0.314; 
 
-extern const double SCORE_GRID[];
 
 // Retained scoring targets from the old SCORE_GRID: SCORE_GRID[1] was 400.
 // The higher target preserves the old +30 motor-degree offset. Calibrate on robot.
-constexpr double SCORE_LOW_POS = 0.314;
+inline constexpr double CASCADE_PICKUP_POS = 0; 
+constexpr double SCORE_LOW_POS = 220;
 constexpr double SCORE_HIGH_POS = 600;
+constexpr double ROT_BUFFER = 200;
+constexpr double ROT_STACK_SIZE = 400;
 
+inline constexpr double CASCADE_PICKUP_POS_DIST = 0.314; 
+constexpr double SCORE_LOW_POS_DIST = 3;
+constexpr double SCORE_HIGH_POS_DIST = 600;
+constexpr double DIST_BUFFER = 8;
