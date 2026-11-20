@@ -105,10 +105,10 @@ inline constexpr double CASCADE_MIN_POS = 0;
 // Retained scoring targets from the old SCORE_GRID: SCORE_GRID[1] was 400.
 // The higher target preserves the old +30 motor-degree offset. Calibrate on robot.
 inline constexpr double CASCADE_PICKUP_POS = 0; 
-constexpr double SCORE_LOW_POS = 220;
+constexpr double SCORE_LOW_POS = 180;
 constexpr double SCORE_HIGH_POS = 600;
 constexpr double ROT_BUFFER = 200;
-constexpr double ROT_STACK_SIZE = 400;
+constexpr double ROT_STACK_SIZE = 275;
 
 inline constexpr double CASCADE_PICKUP_POS_DIST = 0.314; 
 constexpr double SCORE_LOW_POS_DIST = 3;

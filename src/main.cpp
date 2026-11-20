@@ -425,13 +425,13 @@ void opcontrol() {
         if (bPressed) movingToPickup = !movingToPickup;
 
         if (movingToPickup) {
-            lift.move_absolute(CASCADE_PICKUP_POS, 100);
+            lift.move_absolute(CASCADE_PICKUP_POS, 150);
             if (fabs(lift.get_position() - CASCADE_PICKUP_POS) < 10) {
                 movingToPickup = false;
             }
         } else{
             if (r2Held) lift.move(127);
-            else if (l2Held) lift.move(-64);
+            else if (l2Held) lift.move(-96);
             else lift.brake();
         }
 
