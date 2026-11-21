@@ -107,52 +107,79 @@ double getLiftPosition() {
     return mm / 25.4;
 }
 
-void liftUpdate(double target) {
+void liftUpdate(double target, uint32_t timeout) {
     double liftKP = 0.8;
     double tolerance = 0.5;
     double maxSpeed = static_cast<double>(maxRpm(lift));
 
-    while (true) {
-        double currentDistance = lift.get_position();  // getLiftPosition();
+    uint32_t startTime = pros::millis();
 
-        if (currentDistance < 0.0) {
+    while (true) {
+
+        if (pros::millis() - startTime >= timeout) {
             lift.brake();
-            pros::delay(20);
-            continue;
+            liftRunning = false;
+            return;
         }
 
-        double error = target - currentDistance;
+        // Motor encoder position
+        double currentPosition = lift.get_position();
+
+        double error = target - currentPosition;
 
         if (std::abs(error) <= tolerance) {
             lift.brake();
-            liftRunning = false; // Mark task as finished before exiting!
+            liftRunning = false;
             return;
-        } else {
-            double velocity = std::clamp(error * liftKP, -maxSpeed, maxSpeed);
-            lift.move_velocity(static_cast<int32_t>(velocity));
         }
+
+        double velocity = std::clamp(
+            error * liftKP,
+            -maxSpeed,
+            maxSpeed
+        );
+
+        lift.move_velocity(static_cast<int32_t>(velocity));
 
         pros::delay(20);
     }
 }
 
-void liftTo(double position) {
-    // Only kill the task if it is STILL running
+void liftTo(double target, uint32_t timeout) {
+
+    // Stop previous lift command
     if (liftRunning && liftTask != nullptr) {
         liftTask->remove();
         liftRunning = false;
     }
 
-    // Clean up the C++ wrapper safely
+    // Delete old task
     if (liftTask != nullptr) {
         delete liftTask;
         liftTask = nullptr;
     }
 
+    // Start new lift command
     liftRunning = true;
-    liftTask = new pros::Task([position] {
-        liftUpdate(position);
+
+    liftTask = new pros::Task([target, timeout] {
+        liftUpdate(target, timeout);
     });
+}
+
+void stopLift() {
+
+    if (liftRunning && liftTask != nullptr) {
+        liftTask->remove();
+        liftRunning = false;
+    }
+
+    if (liftTask != nullptr) {
+        delete liftTask;
+        liftTask = nullptr;
+    }
+
+    lift.brake();
 }
 
 

@@ -94,10 +94,11 @@ void leftSubmissive() {
     chassis.setPose(0, -63.5, 180);
 
     
-    intake();
+
     
     toggler.retract();
-    liftTo(2);
+    liftTo(200);
+    intake();
     moveWithVoltage(-35,-35);
     pros::delay(420);
 
@@ -111,27 +112,20 @@ void leftSubmissive() {
     moveWithVoltage(50,50);
     pros::delay(400);
     
+    //go to goal
     chassis.moveDistance(-6, 250, {.forwards=false}, false); 
-    liftTo(SCORE_LOW_POS + 4);
-    chassis.moveToPoint(0, -48, 650, {.forwards=false}, false);
-
+    liftTo(SCORE_LOW_POS + ROT_BUFFER+60);
+    chassis.moveToPoint(0, -49.5, 650, {.forwards=false}, false);
     // chassis.waitUntilDone();
-
     printf("Approach pose: x=%f, y=%f, theta=%f\n",
            chassis.getPose().x, chassis.getPose().y, chassis.getPose().theta);
     // Face the scoring location, then command the pivot straight to scoring.
-
-    
     chassis.turnToPoint(24, -48, 600, {.forwards=false}, false);
     // chassis.waitUntilDone();
-
-
     // Approach the scoring point while the cascade continues toward height.
     chassis.moveDistance(-20, 600, {.forwards=false});
     chassis.waitUntil(17);
     chassis.cancelMotion();
-
-
     // Final small contact/settling movement.
     moveWithVoltage(-20, -20);
     pros::delay(350);
@@ -139,60 +133,43 @@ void leftSubmissive() {
     // chassis.moveDistance(2, 300, {}, true);
 
 
+    //score on goal
     liftTo(SCORE_LOW_POS);
     pros::delay(450);
     stoptake();
-    
-    pros::delay(400);
+    pros::delay(200);
 
 
-    chassis.moveDistance(7, 700, {}, false);
+    // go to 3 stack
+    chassis.moveDistance(9, 550, {}, false);
     liftTo(CASCADE_PICKUP_POS);
     printf("%lf", getLiftPosition());
-    chassis.turnToPoint(24, -24, 600, {.forwards=false}, false);
+    chassis.turnToPoint(26, -72, 600, {.forwards=false}, false);
+    moveWithVoltage(-80, -80);
+    pros::delay(300);
+    moveWithVoltage(-30, -30);
+    pros::delay(250);
+    moveWithVoltage(-30, -50);
+    pros::delay(600);
     intake();
-    
-    chassis.moveDistance(-24, 800, {.forwards=false}, true);
-    chassis.waitUntil(17);
-    chassis.cancelMotion();
-    moveWithVoltage(-20, -20);
-
-    pros::delay(200);
-
-    chassis.moveToPoint(24, -24, 500, {.forwards=false}, false);
-    chassis.turnToPoint(24, -48, 600, {.forwards=false}, false);
-    liftTo(SCORE_LOW_POS+8);
-
-
-    //!TODO CHANGE TO POINT LATER
-    chassis.moveDistance(-20, 800, {.forwards=false});
-    chassis.waitUntil(17);
-    chassis.cancelMotion();
-
-    // Final small contact/settling movement.
-    moveWithVoltage(-20, -20);
-    pros::delay(400);
+    pros::delay(250);
+    // moveWithVoltage(-16, -18.5);
+    // pros::delay(1000);
+    liftTo(SCORE_LOW_POS+ROT_BUFFER);
+    chassis.turnToPoint(24, -48, 700, {.forwards=false}, false);
+    moveWithVoltage(-50, -50);
+    pros::delay(850);
     stopDrive();
 
-
+    //score on goal
     liftTo(SCORE_LOW_POS);
-    pros::delay(400);
+    pros::delay(450);
     stoptake();
-    
     pros::delay(200);
 
+    chassis.moveToPose(0, -48, 0, 1200, {.lead=0.5}, false);
 
-    // last 
 
-
-    chassis.moveDistance(7, 700, {}, false);
-    liftTo(CASCADE_PICKUP_POS);
-    chassis.turnToPoint(-24, -60, 600, {.forwards=false}, false);
-    intake();
-    chassis.moveToPoint(-24, -60, 1200, {.forwards=false}, false);
-    chassis.turnToPoint(-24, -72, 600, {.forwards=false}, false);
-    moveWithVoltage(-20, -20);
-    pros::delay(700);
 }
 void rightSubmissive() {
 }
@@ -222,7 +199,7 @@ void leftDominant() {
     
     //go to goal
     chassis.moveDistance(-6, 250, {.forwards=false}, false); 
-    liftTo(SCORE_LOW_POS + ROT_BUFFER);
+    liftTo(SCORE_LOW_POS + ROT_BUFFER+60);
     chassis.moveToPoint(0, -48, 650, {.forwards=false}, false);
     // chassis.waitUntilDone();
     printf("Approach pose: x=%f, y=%f, theta=%f\n",
@@ -255,10 +232,10 @@ void leftDominant() {
     chassis.turnToPoint(24, -24, 550, {.forwards=false}, false);
     intake();
     chassis.moveToPoint(24, -24, 800, {.forwards=false}, true);
-    chassis.waitUntil(12);
+    chassis.waitUntil(10);
     chassis.cancelMotion();
     moveWithVoltage(-20, -20);
-    pros::delay(500);
+    pros::delay(700);
     liftTo(SCORE_LOW_POS+ROT_BUFFER);
     moveWithVoltage(-30,-30);
     pros::delay(250);
@@ -287,10 +264,10 @@ void leftDominant() {
     chassis.turnToPoint(48, -48, 550, {.forwards=false}, false);
     intake();
     chassis.moveToPoint(48, -48, 800, {.forwards=false}, true);
-    chassis.waitUntil(12);
+    chassis.waitUntil(10);
     chassis.cancelMotion();
     moveWithVoltage(-20, -20);
-    pros::delay(500);
+    pros::delay(700);
     liftTo(SCORE_LOW_POS+ROT_BUFFER+ROT_STACK_SIZE);
     moveWithVoltage(-30,-30);
     pros::delay(250);
@@ -316,15 +293,120 @@ void leftDominant() {
 }
 
 void rightDominant() {
-    liftTo(SCORE_LOW_POS + 5);
-    pros::delay(1000);
-    liftTo(SCORE_LOW_POS + 10);
-    pros::delay(1000);
-    liftTo(SCORE_LOW_POS + 15);
-    pros::delay(1000);
-    liftTo(SCORE_LOW_POS + 20);
-    pros::delay(1000);
+    // The robot should start physically in LOAD, matching pivotInitialize().
+    chassis.setPose(0, -63.5, 180);
+
+    
+
+    
+    toggler.retract();
+    liftTo(200);
+    intake();
+    moveWithVoltage(-35,-35);
+    pros::delay(420);
+
+    // toggle 1
+    moveWithVoltage(50, 50);
+    pros::delay(400);
+    moveWithVoltage(-35,-35);
+    pros::delay(450);
+
+    // toggle 2
+    moveWithVoltage(50,50);
+    pros::delay(400);
+    
+    //go to goal
+    chassis.moveDistance(-6, 250, {.forwards=false}, false); 
+    liftTo(SCORE_LOW_POS + ROT_BUFFER+60);
+    chassis.moveToPoint(0, -48, 650, {.forwards=false}, false);
+    // chassis.waitUntilDone();
+    printf("Approach pose: x=%f, y=%f, theta=%f\n",
+           chassis.getPose().x, chassis.getPose().y, chassis.getPose().theta);
+    // Face the scoring location, then command the pivot straight to scoring.
+    chassis.turnToPoint(-24, -48, 600, {.forwards=false}, false);
+    // chassis.waitUntilDone();
+    // Approach the scoring point while the cascade continues toward height.
+    chassis.moveDistance(-20, 600, {.forwards=false});
+    chassis.waitUntil(17);
+    chassis.cancelMotion();
+    // Final small contact/settling movement.
+    moveWithVoltage(-20, -20);
+    pros::delay(350);
+    stopDrive();
+    // chassis.moveDistance(2, 300, {}, true);
+
+
+    //score on goal
     liftTo(SCORE_LOW_POS);
+    pros::delay(450);
+    stoptake();
+    pros::delay(200);
+
+
+    // go to first stack
+    chassis.moveDistance(7, 550, {}, false);
+    liftTo(CASCADE_PICKUP_POS);
+    printf("%lf", getLiftPosition());
+    chassis.turnToPoint(-24, -24, 550, {.forwards=false}, false);
+    intake();
+    chassis.moveToPoint(-24, -24, 800, {.forwards=false}, true);
+    chassis.waitUntil(10);
+    chassis.cancelMotion();
+    moveWithVoltage(-20, -20);
+    pros::delay(700);
+    liftTo(SCORE_LOW_POS+ROT_BUFFER);
+    moveWithVoltage(-30,-30);
+    pros::delay(250);
+    //chassis.moveToPoint(24, -24, 200, {.forwards=false}, false);
+    
+
+
+    //go to goal (2nd time)
+    chassis.turnToPoint(-24, -48, 600, {.forwards=false}, false);
+    //!TODO CHANGE TO POINT LATER
+    chassis.moveDistance(-20, 800, {.forwards=false});
+    chassis.waitUntil(14);
+    chassis.cancelMotion();
+    moveWithVoltage(-10, -10);
+    pros::delay(300);
+    stopDrive();
+    liftTo(SCORE_LOW_POS);
+    pros::delay(300);
+    stoptake();
+    pros::delay(100);
+
+
+    // go to 2nd stack
+    chassis.moveDistance(7, 600, {}, false);
+    liftTo(CASCADE_PICKUP_POS);
+    chassis.turnToPoint(-48, -48, 550, {.forwards=false}, false);
+    intake();
+    chassis.moveToPoint(-48, -48, 800, {.forwards=false}, true);
+    chassis.waitUntil(10);
+    chassis.cancelMotion();
+    moveWithVoltage(-20, -20);
+    pros::delay(700);
+    liftTo(SCORE_LOW_POS+ROT_BUFFER+ROT_STACK_SIZE);
+    moveWithVoltage(-30,-30);
+    pros::delay(250);
+    //chassis.moveToPoint(48, -48, 500, {.forwards=false}, false);
+    
+
+    //go to goal (3rd time)
+    chassis.turnToPoint(-24, -48, 600, {.forwards=false, .maxSpeed=100}, false);
+    //!TODO CHANGE TO POINT LATER
+    chassis.moveDistance(-20, 800, {.forwards=false});
+    chassis.waitUntil(14);
+    chassis.cancelMotion();
+    moveWithVoltage(-10, -10);
+    pros::delay(300);
+    stopDrive();
+    liftTo(SCORE_LOW_POS+ROT_STACK_SIZE);
+    pros::delay(300);
+    stoptake();
+    
+    
+    pros::delay(200);
 }
 // Starting poses for this season's autons go here once field setup is
 // finalized, e.g.:

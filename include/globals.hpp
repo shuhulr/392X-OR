@@ -81,12 +81,13 @@ inline void moveToPercent(pros::AbstractMotor& m, double position, int percent) 
     m.move_absolute(position, (percent * maxRpm(m)) / 100);
 }
 
-void liftTo(double position);
+
 double getLiftPosition();
 
 extern bool intaking;
 extern bool armMoving;
-extern void liftTo(double position);
+extern void liftTo(double position, uint32_t timeout = 900);
+extern void stopLift();
 
 extern const int PTO_MOTOR_PORT;                // negative means reversed; sign that runs the intake in
 extern const char PTO_PISTON_PORT;
