@@ -60,7 +60,7 @@ pros::MotorGroup lift({-20, 11}, pros::MotorGearset::green);
 
 
 // pivot (claw pitch, port 6) and flip (claw rotation, port 16 reversed)
-pros::Motor clawMotor(-13);
+pros::Motor clawMotor(-13, pros::MotorGearset::green);
 
 // Dedicated pivot feedback sensor on port 9. Negative port reverses its
 // reported direction, so pivot-up should produce increasing position.

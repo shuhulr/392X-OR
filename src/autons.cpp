@@ -114,7 +114,7 @@ void leftSubmissive() {
     
     //go to goal
     chassis.moveDistance(-6, 250, {.forwards=false}, false); 
-    liftTo(SCORE_LOW_POS + ROT_BUFFER+60);
+    liftTo(SCORE_LOW_POS + ROT_BUFFER+30);
     chassis.moveToPoint(0, -49.5, 650, {.forwards=false}, false);
     // chassis.waitUntilDone();
     printf("Approach pose: x=%f, y=%f, theta=%f\n",
@@ -144,15 +144,16 @@ void leftSubmissive() {
     chassis.moveDistance(9, 550, {}, false);
     liftTo(CASCADE_PICKUP_POS);
     printf("%lf", getLiftPosition());
-    chassis.turnToPoint(26, -72, 600, {.forwards=false}, false);
+    chassis.turnToPoint(27.5, -72, 600, {.forwards=false}, false);
     moveWithVoltage(-80, -80);
     pros::delay(300);
-    moveWithVoltage(-30, -30);
-    pros::delay(250);
-    moveWithVoltage(-30, -50);
-    pros::delay(600);
+
+    moveWithVoltage(-15, -15);
+    pros::delay(100);
     intake();
-    pros::delay(250);
+    pros::delay(700);
+    moveWithVoltage(-12.5, -37.5);
+    pros::delay(800);
     // moveWithVoltage(-16, -18.5);
     // pros::delay(1000);
     liftTo(SCORE_LOW_POS+ROT_BUFFER);
